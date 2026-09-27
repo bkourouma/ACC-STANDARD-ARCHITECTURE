@@ -31,6 +31,14 @@ ou les fichiers concernés quand le projet le permet :
 - `commands.typecheck` et `commands.lint` ;
 - `commands.test`, au minimum sur les tests proches des fichiers modifiés.
 
+Une commande vide (`""`) dans `commands` veut dire que le projet ne la
+fournit pas : ne pas en inventer une (pas de `npm test` supposé), ne pas la
+compter comme réussie. Si `commands.test` est vide, le rapport le dit
+explicitement dans les vérifications non faites (« aucun test automatisé
+configuré ») et, pour chaque changement de comportement du périmètre,
+indique le scénario de vérification manuelle qui le couvre ou signale son
+absence comme constat Important. Même règle pour `typecheck` et `lint`.
+
 S'il existe une dette préexistante (erreurs connues, voir « Pièges connus »
 d'`AGENTS.md`), compare le compte avant/après plutôt que d'exiger zéro : une
 **nouvelle** erreur dans un fichier du périmètre qui en était exempt est
@@ -83,5 +91,6 @@ un constat déjà connu et non aggravé par le périmètre est mentionné à par
 hors du compte des constats nouveaux.
 
 Termine par une synthèse courte : périmètre audité, nombre de constats par
-gravité, et la liste des vérifications qui n'ont rien trouvé (pour que
-l'absence de mention ne se lise pas comme un oubli).
+gravité, la liste des vérifications qui n'ont rien trouvé (pour que
+l'absence de mention ne se lise pas comme un oubli) et celle des
+vérifications non faites faute de commande configurée.

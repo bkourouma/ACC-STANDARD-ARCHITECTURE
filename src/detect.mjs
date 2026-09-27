@@ -11,6 +11,15 @@ const PROTECTED_CANDIDATES = ['src', 'app', 'apps', 'packages', 'lib', 'uploads'
 const DEFAULT_NPM_TEST = 'echo "Error: no test specified" && exit 1';
 const PROJECT_MARKER_FILES = ['package.json', 'pyproject.toml', 'requirements.txt', 'go.mod', 'Cargo.toml'];
 const IMPLICIT_TYPECHECK = 'npx tsc --noEmit';
+// Next.js ≥ 16 : tsc a besoin des types de routes générés par `next typegen`.
+const NEXT_TYPEGEN_TYPECHECK = 'npx next typegen && npx tsc --noEmit';
+const NEXT_TYPEGEN_MAJOR = 16;
+// Ports par défaut des serveurs de développement (voir §7 du contrat).
+const FRAMEWORK_PORTS = [
+  { dep: 'next', port: 3000 },
+  { dep: 'vite', port: 5173 },
+];
+const DOCKERFILE_RE = /^(?:Dockerfile(?:\..+)?|.+\.Dockerfile)$/i;
 
 const has = (target, rel) => fs.existsSync(path.join(target, rel));
 const isDir = (target, rel) => {
@@ -98,9 +107,26 @@ function detectLanguages(target, pkg, typescript) {
 }
 
 /**
+ * Version majeure d'une plage de dépendance (« ^16.0.1 », « 16.3.6 »,
+ * « >=15 ») ; null si elle ne commence pas par un numéro (« latest »,
+ * « canary », « workspace:* »…).
+ */
+export function majorVersion(range) {
+  const match = /^\s*(?:[\^~]|[<>]=?|=)?\s*v?(\d+)/.exec(String(range ?? ''));
+  return match ? Number(match[1]) : null;
+}
+
+/** Vrai si le package.json dépend de Next.js en version ≥ 16. */
+function usesNextTypegen(pkg) {
+  const major = majorVersion(allDeps(pkg).next);
+  return major !== null && major >= NEXT_TYPEGEN_MAJOR;
+}
+
+/**
  * Commandes du projet, préfixées par le gestionnaire. Si TypeScript est
  * détecté et qu'aucun script `typecheck` n'existe, propose `npx tsc --noEmit`
- * (voir §7 du contrat) plutôt que de laisser la commande vide.
+ * — précédé de `npx next typegen` pour Next.js ≥ 16 — (voir §7 du contrat)
+ * plutôt que de laisser la commande vide.
  */
 function detectCommands(target, pkg, pm, typescript) {
   const commands = { install: '', dev: '', build: '', typecheck: '', lint: '', test: '' };
@@ -118,25 +144,71 @@ function detectCommands(target, pkg, pm, typescript) {
   if (typeof scripts.test === 'string' && scripts.test.trim() !== DEFAULT_NPM_TEST) {
     commands.test = pm === 'bun' ? 'bun run test' : `${pm} test`;
   }
-  if (!commands.typecheck && typescript) commands.typecheck = IMPLICIT_TYPECHECK;
+  if (!commands.typecheck && typescript) {
+    commands.typecheck = usesNextTypegen(pkg) ? NEXT_TYPEGEN_TYPECHECK : IMPLICIT_TYPECHECK;
+  }
   return commands;
 }
 
-/** Ports lus dans les fichiers d'exemple d'environnement (jamais .env). */
+/**
+ * Ports, sans écraser une clé déjà trouvée (§7 du contrat) : fichiers
+ * d'exemple d'environnement (jamais .env), puis `.claude/launch.json`, puis
+ * port par défaut du cadriciel de chaque paquet.
+ */
 function detectPorts(target, wsDirs) {
   const ports = {};
   const dirs = ['', ...wsDirs];
+  const dirKey = (dir) => (dir ? path.basename(dir) : 'app');
   for (const dir of dirs) {
     for (const file of ['.env.example', 'env.example']) {
       const text = readTextIfExists(path.join(target, dir, file));
       if (text === null) continue;
       for (const m of toLf(text).matchAll(/^\s*(?:export\s+)?(?:([A-Z0-9_]+)_)?PORT\s*=\s*["']?(\d+)/gm)) {
-        const key = m[1] ? m[1].toLowerCase() : dir ? path.basename(dir) : 'app';
+        const key = m[1] ? m[1].toLowerCase() : dirKey(dir);
         if (!(key in ports)) ports[key] = Number(m[2]);
       }
     }
   }
+  for (const { name, port } of launchPorts(target)) {
+    const key = slugify(name) || 'app';
+    if (!(key in ports)) ports[key] = port;
+  }
+  const used = () => new Set(Object.values(ports));
+  for (const dir of dirs) {
+    const port = frameworkPort(readPackageJson(path.join(target, dir)));
+    const key = dirKey(dir);
+    if (port !== null && !(key in ports) && !used().has(port)) ports[key] = port;
+  }
   return ports;
+}
+
+/** Ports déclarés dans `.claude/launch.json` (configurations[].port). */
+function launchPorts(target) {
+  const text = readTextIfExists(path.join(target, '.claude', 'launch.json'));
+  if (text === null) return [];
+  let launch;
+  try {
+    launch = JSON.parse(toLf(text));
+  } catch {
+    return [];
+  }
+  const configurations = Array.isArray(launch?.configurations) ? launch.configurations : [];
+  return configurations
+    .filter((c) => Number.isInteger(c?.port) && c.port > 0)
+    .map((c) => ({ name: typeof c.name === 'string' ? c.name : '', port: c.port }));
+}
+
+/**
+ * Port du serveur de développement d'un paquet : celui passé par `-p` /
+ * `--port` dans son script `dev`, sinon le port par défaut du cadriciel.
+ */
+function frameworkPort(pkg) {
+  const deps = allDeps(pkg);
+  const framework = FRAMEWORK_PORTS.find((f) => f.dep in deps);
+  if (!framework) return null;
+  const dev = typeof pkg.scripts?.dev === 'string' ? pkg.scripts.dev : '';
+  const explicit = /(?:^|\s)(?:-p|--port)(?:\s+|=)(\d+)\b/.exec(dev);
+  return explicit ? Number(explicit[1]) : framework.port;
 }
 
 function detectPrisma(target, deps, wsDirs) {
@@ -201,8 +273,47 @@ export function findNearbyProjects(target) {
   return found.sort();
 }
 
+/** Dockerfiles de la racine et des workspaces (chemins relatifs POSIX). */
+function findDockerfiles(target, wsDirs) {
+  return ['', ...wsDirs].flatMap((dir) =>
+    listDir(path.join(target, dir))
+      .filter((name) => DOCKERFILE_RE.test(name) && !isDir(target, path.join(dir, name)))
+      .map((name) => (dir ? `${dir}/${name}` : name)),
+  );
+}
+
+/** Avertissements propres à un projet Node (package.json racine). */
+function nodeWarnings(target, pkg, wsDirs) {
+  const warnings = [];
+  const scripts = pkg.scripts ?? {};
+  if (usesNextTypegen(pkg) && typeof scripts.typecheck === 'string' && !/\btypegen\b/.test(scripts.typecheck)) {
+    warnings.push(
+      `Next.js ≥ ${NEXT_TYPEGEN_MAJOR} : le script typecheck (« ${scripts.typecheck} ») ne lance pas ` +
+        '`next typegen` ; sans les types de routes générés, tsc peut échouer. Proposition : ' +
+        `\`${NEXT_TYPEGEN_TYPECHECK}\`.`,
+    );
+  }
+  const generators = ['prebuild', 'predev'].filter((name) => typeof scripts[name] === 'string');
+  if (generators.length) {
+    const list = generators.map((name) => `${name} (« ${scripts[name]} »)`).join(', ');
+    warnings.push(
+      `Script(s) ${list} : s'ils génèrent des fichiers requis par tsc ou les tests, les lancer avant ` +
+        'commands.typecheck (et dans hooks.preCommit, la CI) — un checkout propre ne les contient pas.',
+    );
+  }
+  const dockerfiles = findDockerfiles(target, wsDirs);
+  if (dockerfiles.length) {
+    warnings.push(
+      `${dockerfiles.join(', ')} détecté(s) : le script prepare tourne pendant l'installation des ` +
+        'dépendances de l\'image, souvent avant la copie de scripts/. Le prepare posé par le standard ' +
+        'tolère l\'absence de scripts/install-git-hooks.cjs ; un prepare existant doit en faire autant.',
+    );
+  }
+  return warnings;
+}
+
 /** Avertissements utiles pour l'humain qui relit la proposition. */
-function detectWarnings(target, deps) {
+function detectWarnings(target, deps, pkg, wsDirs) {
   const warnings = [];
   if (has(target, '.husky') || 'husky' in deps) {
     warnings.push(
@@ -213,6 +324,7 @@ function detectWarnings(target, deps) {
   if (has(target, 'lefthook.yml') || has(target, '.lefthook.yml')) {
     warnings.push('Configuration Lefthook existante : vérifier la fusion après apply.');
   }
+  if (pkg) warnings.push(...nodeWarnings(target, pkg, wsDirs));
   return warnings;
 }
 
@@ -281,5 +393,5 @@ export function detectProject(target) {
     options: { agentBus: true, demoInstance: false },
     demo: {},
   };
-  return { config, warnings: detectWarnings(target, deps) };
+  return { config, warnings: detectWarnings(target, deps, pkg, wsDirs) };
 }

@@ -44,10 +44,15 @@ Depuis un clone local, remplacer `npx github:…` par
 | Commande | Effet |
 | --- | --- |
 | `detect [cible] [--write]` | Propose `acc.config.json` à partir du projet |
-| `plan [cible] [--json]` | Simulation : `+` créer, `~` mettre à jour, `=` inchangé, `·` seed présent, `»` fusion, `!` conflit |
-| `apply [cible] [--branch] [--allow-dirty] [--force]` | Applique et écrit `.acc/manifest.json` ; ne commite jamais |
-| `doctor [cible]` | Vérifie hooks installés, fichiers présents, dérives locales, conflits en attente |
-| `update [cible]` | Migrations vers la version courante du standard, puis `apply` |
+| `plan [cible] [--json] [--adopt]` | Simulation : `+` créer, `~` mettre à jour, `=` inchangé, `·` seed présent, `»` fusion, `!` conflit |
+| `apply [cible] [--branch] [--allow-dirty] [--force] [--adopt]` | Applique et écrit `.acc/manifest.json` ; ne commite jamais |
+| `doctor [cible]` | Vérifie hooks installés, fichiers présents, dérives locales, conflits et squelettes en attente |
+| `update [cible] [--adopt]` | Migrations vers la version courante du standard, puis `apply` |
+
+Projet déjà équipé (fichiers de l'architecture présents avant le standard,
+nombreux conflits `.acc-new` au premier `plan`) : `apply --adopt` pose la
+version du standard pour les seuls fichiers jamais repris par lui, en gardant
+la version locale en `.acc-bak` ; relire ensuite `git diff`.
 
 ## Modes de propriété
 
@@ -58,7 +63,9 @@ détruit rien :
   été modifié sur place ; dans ce cas il y a conflit et un fichier `.acc-new`
   est écrit à côté.
 - **block** : seules les sections `<!-- acc:begin id -->` … `<!-- acc:end id -->`
-  sont gérées ; le reste appartient au projet.
+  sont gérées ; le reste appartient au projet. Si le fichier existait déjà,
+  le fichier complet du standard est écrit dans `.acc/skeletons/` pour que
+  `/acc-adapt` y reprenne les sections manquantes.
 - **seed** : écrit une fois s'il est absent, puis appartient au projet.
 - **merge-json** / **merge-lines** : fusion sans suppression (`settings.json`,
   `package.json`, `.mcp.json`, `.gitignore`).

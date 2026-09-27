@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable -- script CommonJS géré par acc-standard : require() voulu, hors du lint du projet. */
 /**
  * Instance de démo figée sur une révision précise.
  *

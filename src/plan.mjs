@@ -34,9 +34,9 @@ export function renderContext(config) {
 
 /**
  * Calcule le plan complet.
- * @returns {{ target, config, profiles, items, totals, conflicts, nextSteps, manifest }}
+ * @returns {{ target, config, profiles, items, totals, conflicts, skeletons, adopted, nextSteps, manifest }}
  */
-export function computePlan(target, { templatesDir, force = false, config: given } = {}) {
+export function computePlan(target, { templatesDir, force = false, adopt = false, config: given } = {}) {
   const config = given ?? loadConfig(target);
   const manifest = readManifest(target);
   const profiles = resolveProfiles(templatesDir, selectedProfileIds(config));
@@ -44,7 +44,7 @@ export function computePlan(target, { templatesDir, force = false, config: given
   const items = files.map((item) => {
     const current = readTextIfExists(item.abs);
     const entry = manifest?.files?.[item.dest];
-    const result = PLANNERS[item.mode](item, { current, entry, force });
+    const result = PLANNERS[item.mode](item, { current, entry, force, adopt, target });
     return { ...item, ...result };
   });
   const totals = Object.fromEntries(Object.keys(ACTION_LABELS).map((a) => [a, 0]));
@@ -56,6 +56,8 @@ export function computePlan(target, { templatesDir, force = false, config: given
     items,
     totals,
     conflicts: totals['!'],
+    skeletons: items.filter((i) => i.skeleton).map((i) => i.skeleton),
+    adopted: items.filter((i) => i.adopted).map((i) => i.dest),
     nextSteps: collectNextSteps(profiles),
     manifest,
   };
