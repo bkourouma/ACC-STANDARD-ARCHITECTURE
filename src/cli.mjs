@@ -2,16 +2,16 @@
 import path from 'node:path';
 import { applyStandard } from './apply.mjs';
 import { CONFIG_FILE, readRawConfig, writeConfig } from './config.mjs';
-import { detectProject } from './detect.mjs';
+import { detectProject, findNearbyProjects, isUnrecognizedTarget } from './detect.mjs';
 import { formatDoctor, runDoctor } from './doctor.mjs';
 import { AccError, stringifyJson } from './fs-utils.mjs';
 import { computePlan, formatPlan, planToJson } from './plan.mjs';
 import { updateStandard } from './update.mjs';
-import { migrationsDir, STANDARD_VERSION, templatesDir } from './version.mjs';
+import { migrationsDir, STANDARD_COMMAND, STANDARD_VERSION, templatesDir } from './version.mjs';
 
 export const HELP = `acc-standard ${STANDARD_VERSION} — architecture agentique standard
 
-Usage :
+Usage (remplacer par « ${STANDARD_COMMAND} » si l'outil n'est pas installé) :
   acc-standard detect [cible] [--write] [--force]
       Analyse le projet et propose ${CONFIG_FILE}.
       --write  écrit la config si elle est absente ; --force la remplace.
@@ -73,9 +73,32 @@ function checkFlags(parsed) {
   if (parsed.positionals.length > 1) throw new AccError('Une seule cible est acceptée.');
 }
 
+/**
+ * Avertissement + candidats quand la cible ne ressemble à aucun projet
+ * reconnu ET qu'un vrai projet est trouvé juste à côté (typiquement : la
+ * commande a été lancée un dossier trop haut). Un dossier vide sans aucun
+ * sous-dossier candidat reste un « projet vierge » ordinaire (profil
+ * `base`) : ce n'est pas en soi le signe d'une mauvaise cible.
+ */
+function unrecognizedTargetWarning(target, nearby) {
+  const lines = [
+    `${target} ne ressemble à aucun projet reconnu ` +
+      '(pas de package.json, pyproject.toml, requirements.txt, go.mod, Cargo.toml, ni dépôt git).',
+    'Projet(s) trouvé(s) à proximité :',
+  ];
+  for (const rel of nearby) lines.push(`  - ${rel} : cd ${rel} && ${STANDARD_COMMAND} detect --write`);
+  return lines.join('\n');
+}
+
 function runDetect(target, flags, io) {
+  const nearby = isUnrecognizedTarget(target) ? findNearbyProjects(target) : [];
+  if (nearby.length && flags.has('write')) {
+    io.err(unrecognizedTargetWarning(target, nearby));
+    return 1;
+  }
   const { config, warnings } = detectProject(target);
   for (const w of warnings) io.err(`Attention : ${w}`);
+  if (nearby.length) io.err(unrecognizedTargetWarning(target, nearby));
   if (!flags.has('write')) {
     io.out(stringifyJson(config).trimEnd());
     return 0;
@@ -84,7 +107,7 @@ function runDetect(target, flags, io) {
     throw new AccError(`${CONFIG_FILE} existe déjà ; relancez avec --force pour le remplacer.`);
   }
   writeConfig(target, config);
-  io.out(`${CONFIG_FILE} écrit. Relisez-le, puis lancez : acc-standard plan`);
+  io.out(`${CONFIG_FILE} écrit. Relisez-le, puis lancez : ${STANDARD_COMMAND} plan`);
   return 0;
 }
 

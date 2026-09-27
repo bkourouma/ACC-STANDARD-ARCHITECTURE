@@ -30,14 +30,32 @@ export function gitDir(cwd) {
   return res.ok ? res.stdout : null;
 }
 
-/** Branche principale : origin/HEAD, sinon branche courante, sinon main. */
+/** Vrai si une branche locale <name> existe (refs/heads/<name>). */
+function localBranchExists(cwd, name) {
+  return runGit(['show-ref', '--verify', '--quiet', `refs/heads/${name}`], cwd).ok;
+}
+
+/**
+ * Branche principale : `refs/remotes/origin/HEAD`, sinon une branche locale
+ * `main`, sinon `master`, sinon la branche courante, sinon `main`.
+ *
+ * `source` distingue une origine fiable (`origin`, ou un `main`/`master`
+ * local réellement présent) d'un simple repli sur la branche courante ou sur
+ * la valeur par défaut : seule une origine fiable justifie d'ajouter le nom
+ * obtenu à `protectedBranches` (voir detect.mjs), pour ne jamais protéger par
+ * défaut la branche de travail sur laquelle `detect` est lancé.
+ */
 export function detectMainBranch(cwd) {
   const remote = runGit(['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD'], cwd);
-  if (remote.ok && remote.stdout) return remote.stdout.replace(/^refs\/remotes\/origin\//, '');
-  if (!isGitRepo(cwd)) return 'main';
+  if (remote.ok && remote.stdout) {
+    return { name: remote.stdout.replace(/^refs\/remotes\/origin\//, ''), source: 'origin' };
+  }
+  if (localBranchExists(cwd, 'main')) return { name: 'main', source: 'local-main' };
+  if (localBranchExists(cwd, 'master')) return { name: 'master', source: 'local-master' };
+  if (!isGitRepo(cwd)) return { name: 'main', source: 'default' };
   const current = runGit(['symbolic-ref', '--quiet', '--short', 'HEAD'], cwd);
-  if (current.ok && current.stdout) return current.stdout;
-  return 'main';
+  if (current.ok && current.stdout) return { name: current.stdout, source: 'current' };
+  return { name: 'main', source: 'default' };
 }
 
 /** Crée et bascule sur une nouvelle branche (`git switch -c`). */

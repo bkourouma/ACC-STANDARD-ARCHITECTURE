@@ -4,11 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defaultConfig, slugify } from './config.mjs';
 import { readTextIfExists, toLf } from './fs-utils.mjs';
-import { detectMainBranch } from './git.mjs';
+import { detectMainBranch, isGitRepo } from './git.mjs';
 import { STANDARD_VERSION } from './version.mjs';
 
 const PROTECTED_CANDIDATES = ['src', 'app', 'apps', 'packages', 'lib', 'uploads', 'assets', 'public'];
 const DEFAULT_NPM_TEST = 'echo "Error: no test specified" && exit 1';
+const PROJECT_MARKER_FILES = ['package.json', 'pyproject.toml', 'requirements.txt', 'go.mod', 'Cargo.toml'];
+const IMPLICIT_TYPECHECK = 'npx tsc --noEmit';
 
 const has = (target, rel) => fs.existsSync(path.join(target, rel));
 const isDir = (target, rel) => {
@@ -95,11 +97,16 @@ function detectLanguages(target, pkg, typescript) {
   return langs;
 }
 
-/** Commandes du projet, préfixées par le gestionnaire. */
-function detectCommands(target, pkg, pm) {
+/**
+ * Commandes du projet, préfixées par le gestionnaire. Si TypeScript est
+ * détecté et qu'aucun script `typecheck` n'existe, propose `npx tsc --noEmit`
+ * (voir §7 du contrat) plutôt que de laisser la commande vide.
+ */
+function detectCommands(target, pkg, pm, typescript) {
   const commands = { install: '', dev: '', build: '', typecheck: '', lint: '', test: '' };
   if (!pkg) {
     if (has(target, 'requirements.txt')) commands.install = 'pip install -r requirements.txt';
+    if (typescript) commands.typecheck = IMPLICIT_TYPECHECK;
     return commands;
   }
   commands.install = `${pm} install`;
@@ -111,6 +118,7 @@ function detectCommands(target, pkg, pm) {
   if (typeof scripts.test === 'string' && scripts.test.trim() !== DEFAULT_NPM_TEST) {
     commands.test = pm === 'bun' ? 'bun run test' : `${pm} test`;
   }
+  if (!commands.typecheck && typescript) commands.typecheck = IMPLICIT_TYPECHECK;
   return commands;
 }
 
@@ -147,9 +155,50 @@ function detectHooks(commands) {
     });
   }
   if (commands.lint) {
-    preCommit.push({ name: 'lint', command: commands.lint, blocking: false, whenStaged: [] });
+    preCommit.push({
+      name: 'lint',
+      command: commands.lint,
+      blocking: false,
+      whenStaged: ['**/*.{js,jsx,mjs,cjs,ts,tsx}'],
+    });
   }
   return preCommit;
+}
+
+/**
+ * Vrai si la cible ne ressemble à aucun projet reconnu : ni `package.json`,
+ * ni marqueur d'un autre langage (§1 du contrat), ni dépôt git (pas de
+ * `.git` à sa racine, et `git rev-parse` échoue — donc pas non plus un
+ * sous-dossier d'un dépôt parent).
+ */
+export function isUnrecognizedTarget(target) {
+  if (anyFile(target, PROJECT_MARKER_FILES)) return false;
+  if (has(target, '.git')) return false;
+  if (isGitRepo(target)) return false;
+  return true;
+}
+
+const isSkippedDir = (name) => name === 'node_modules' || name === '.git' || name.startsWith('.');
+const looksLikeProject = (dir) => fs.existsSync(path.join(dir, 'package.json')) || fs.existsSync(path.join(dir, '.git'));
+
+/**
+ * Sous-dossiers directs (profondeur 1 et 2, hors `node_modules`, `.git` et
+ * dossiers cachés) qui contiennent un `.git` ou un `package.json` — les
+ * candidats à proposer quand la cible elle-même n'est pas reconnue.
+ */
+export function findNearbyProjects(target) {
+  const found = [];
+  for (const name1 of listDir(target)) {
+    if (isSkippedDir(name1) || !isDir(target, name1)) continue;
+    const abs1 = path.join(target, name1);
+    if (looksLikeProject(abs1)) found.push(name1);
+    for (const name2 of listDir(abs1)) {
+      if (isSkippedDir(name2) || !isDir(abs1, name2)) continue;
+      const abs2 = path.join(abs1, name2);
+      if (looksLikeProject(abs2)) found.push(`${name1}/${name2}`);
+    }
+  }
+  return found.sort();
 }
 
 /** Avertissements utiles pour l'humain qui relit la proposition. */
@@ -182,8 +231,8 @@ export function detectProject(target) {
   const eslint = 'eslint' in deps || anyPrefix(target, ['eslint.config.', '.eslintrc']);
   const prettier = 'prettier' in deps || anyPrefix(target, ['.prettierrc', 'prettier.config.']);
   const name = (typeof pkg?.name === 'string' && pkg.name) || path.basename(path.resolve(target));
-  const commands = detectCommands(target, pkg, pm);
-  const mainBranch = detectMainBranch(target);
+  const commands = detectCommands(target, pkg, pm, typescript);
+  const { name: mainBranch, source: mainBranchSource } = detectMainBranch(target);
 
   const adapters = ['claude'];
   if (isDir(target, '.codex')) adapters.push('codex');
@@ -217,7 +266,13 @@ export function detectProject(target) {
     },
     commands,
     ports: detectPorts(target, wsDirs),
-    git: { mainBranch, protectedBranches: [...new Set([mainBranch, 'main', 'master'])] },
+    git: {
+      mainBranch,
+      // 'main' et 'master' sont toujours protégées ; mainBranch ne s'y
+      // ajoute que s'il vient d'une origine fiable (origin/HEAD), jamais
+      // d'un simple repli sur la branche courante (voir git.mjs).
+      protectedBranches: [...new Set(['main', 'master', ...(mainBranchSource === 'origin' ? [mainBranch] : [])])],
+    },
     hooks: { preCommit: detectHooks(commands) },
     guard: {
       protectedPaths: PROTECTED_CANDIDATES.filter((d) => isDir(target, d)),

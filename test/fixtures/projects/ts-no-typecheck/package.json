@@ -1,0 +1,13 @@
+{
+  "name": "ts-no-typecheck",
+  "version": "1.0.0",
+  "description": "Projet TypeScript sans script typecheck",
+  "scripts": {
+    "dev": "node src/index.js",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -223,6 +223,32 @@ ou variable ACC_TEMPLATES_DIR)
 - `cible` par défaut : dossier courant.
 - `detect` affiche la config proposée ; `--write` l'écrit si absente
   (`--force` pour remplacer).
+  - `git.mainBranch` : `refs/remotes/origin/HEAD`, sinon une branche locale
+    `main`, sinon `master`, sinon la branche courante, sinon `main`.
+    `git.protectedBranches` contient toujours `main` et `master` ; le nom
+    obtenu pour `mainBranch` ne s'y ajoute que s'il vient d'`origin/HEAD` —
+    jamais un simple repli sur la branche courante ou sur la valeur par
+    défaut, pour ne pas protéger la branche de travail sur laquelle `detect`
+    est lancé (ce qui bloquerait son propre pre-push).
+  - Si TypeScript est détecté (dépendance ou `tsconfig.json`) sans script
+    `typecheck`, `commands.typecheck` propose `npx tsc --noEmit` et
+    `hooks.preCommit` reçoit le contrôle bloquant correspondant
+    (`whenStaged: ["**/*.ts", "**/*.tsx"]`). Le contrôle `lint` (non
+    bloquant) reçoit par défaut `whenStaged: ["**/*.{js,jsx,mjs,cjs,ts,tsx}"]`.
+  - Si la cible ne ressemble à aucun projet reconnu (aucun de `package.json`,
+    `pyproject.toml`, `requirements.txt`, `go.mod`, `Cargo.toml`, aucun dépôt
+    git) **et** qu'un vrai projet existe dans un sous-dossier direct
+    (profondeur 1 ou 2, hors `node_modules`, `.git`, dossiers cachés — un
+    sous-dossier contenant lui-même un `.git` ou un `package.json`) :
+    `--write` n'écrit rien et sort en code 1 en listant ces sous-dossiers avec
+    la commande à relancer dedans ; sans `--write`, le même avertissement va
+    sur stderr en plus de la proposition habituelle. Une cible vide sans
+    aucun sous-projet à proximité reste un projet « vierge » ordinaire
+    (profil `base`), pas une erreur.
+  - Les messages qui invitent à relancer l'outil (ici et dans les autres
+    commandes) utilisent la commande réellement exécutable
+    `npx github:bkourouma/ACC-STANDARD-ARCHITECTURE`, pas `acc-standard` seul
+    (non publié sur le registre npm).
 - `plan` et `apply` exigent `acc.config.json` (sinon message qui propose
   `detect --write`, code 1).
 - `plan` : une ligne par fichier — `+` créer, `~` mettre à jour, `=`
