@@ -159,6 +159,16 @@ SHA-256 hexadécimal du contenu normalisé.
 | `merge-json`  | créer (JSON du fragment) | fusion profonde, voir ci-dessous |
 | `merge-lines` | créer | ajouter les lignes absentes à la fin, sous un en-tête `# acc-standard` ajouté une seule fois |
 
+Fusion `merge-lines` — ordre des négations : les lignes de négation du
+fragment (commençant par `!`, ex. `!.env.example`) doivent rester après le
+motif qu'elles réhabilitent, sans quoi elles perdent leur effet. Si au moins
+une ligne non-négation du fragment est ajoutée à la cible, **toutes** les
+lignes de négation du fragment sont (ré)écrites à la fin du bloc ajouté, dans
+l'ordre du fragment, même si elles existent déjà plus haut dans le fichier
+(elles y restent en double : la dernière occurrence fait foi pour Git). Si
+aucune ligne non-négation n'est ajoutée, rien n'est écrit — idempotence
+stricte, un `apply` répété ne modifie aucun octet.
+
 Marqueurs de bloc (Markdown) :
 
 ```text

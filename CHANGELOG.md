@@ -17,6 +17,13 @@ ou supprime un fichier géré fournit `migrations/<version>.mjs`.
   `detect --write`, dans `--help`, etc.) donnent désormais une commande
   réellement exécutable (`npx github:bkourouma/ACC-STANDARD-ARCHITECTURE`)
   au lieu de `acc-standard` seul, qui suppose une installation locale.
+- Correction (`merge-lines`) : quand au moins une ligne de motif est ajoutée,
+  les lignes de négation (`!…`) du fragment sont désormais réécrites en bloc
+  à la fin, dans l'ordre du fragment, même si elles existent déjà plus haut
+  dans le fichier — sinon une négation déjà présente restait avant le motif
+  qu'elle réhabilite et perdait son effet (ex. `!.env.example` avant
+  `.env.*`, qui redevenait ignoré). Idempotent : sans ligne de motif ajoutée,
+  rien ne change.
 - Correction (`detect`) : si la cible ne ressemble à aucun projet reconnu et
   qu'un vrai projet est trouvé dans un sous-dossier proche, `--write` n'écrit
   rien et sort en erreur en listant ces sous-dossiers avec la commande à
