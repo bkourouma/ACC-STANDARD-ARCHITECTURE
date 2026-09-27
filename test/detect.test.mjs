@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { validateConfig } from '../src/config.mjs';
-import { detectProject } from '../src/detect.mjs';
-import { STANDARD_VERSION } from '../src/version.mjs';
+import { detectProject, findNearbyProjects, isUnrecognizedTarget } from '../src/detect.mjs';
+import { STANDARD_COMMAND, STANDARD_VERSION } from '../src/version.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import { cli, copyProject, exists, git, gitInit, read } from './helpers.mjs';
+import { cli, commitAll, copyProject, exists, git, gitInit, read } from './helpers.mjs';
 
 test('detect : projet Node simple', () => {
   const dir = copyProject('node-simple');
@@ -37,7 +37,12 @@ test('detect : projet Node simple', () => {
   assert.equal(config.git.mainBranch, 'main');
   assert.deepEqual(config.hooks.preCommit, [
     { name: 'typecheck', command: 'npm run typecheck', blocking: true, whenStaged: ['**/*.ts', '**/*.tsx'] },
-    { name: 'lint', command: 'npm run lint', blocking: false, whenStaged: [] },
+    {
+      name: 'lint',
+      command: 'npm run lint',
+      blocking: false,
+      whenStaged: ['**/*.{js,jsx,mjs,cjs,ts,tsx}'],
+    },
   ]);
   assert.deepEqual(config.guard.protectedPaths, ['src']);
   assert.equal(config.guard.destructiveCommands.length, 1);
@@ -92,8 +97,67 @@ test('detect : branche courante et adaptateurs', () => {
   fs.mkdirSync(path.join(dir, '.cursor'));
   const { config } = detectProject(dir);
   assert.equal(config.git.mainBranch, 'trunk');
-  assert.deepEqual(config.git.protectedBranches, ['trunk', 'main', 'master']);
+  // 'trunk' n'est qu'un repli sur la branche courante (pas de main/master
+  // local, pas d'origin/HEAD) : elle ne doit pas devenir protégée pour
+  // autant, sous peine de bloquer le pre-push sur la branche de travail.
+  assert.deepEqual(config.git.protectedBranches, ['main', 'master']);
   assert.deepEqual(config.adapters, ['claude', 'codex', 'cursor']);
+});
+
+test('detect : master local + branche de travail courante sans remote → mainBranch master', () => {
+  const dir = copyProject('blank');
+  git(dir, 'init', '-q', '-b', 'master');
+  git(dir, 'config', 'user.email', 'test@example.com');
+  git(dir, 'config', 'user.name', 'Test');
+  git(dir, 'config', 'core.autocrlf', 'false');
+  git(dir, 'config', 'commit.gpgsign', 'false');
+  commitAll(dir, 'initial');
+  git(dir, 'switch', '-q', '-c', 'feature/x');
+  const { config } = detectProject(dir);
+  assert.equal(config.git.mainBranch, 'master');
+  assert.deepEqual(config.git.protectedBranches, ['main', 'master']);
+  assert.ok(!config.git.protectedBranches.includes('feature/x'));
+});
+
+test('detect : TypeScript sans script typecheck → npx tsc --noEmit proposé', () => {
+  const dir = copyProject('ts-no-typecheck');
+  const { config } = detectProject(dir);
+  assert.equal(config.stack.typescript, true);
+  assert.equal(config.commands.typecheck, 'npx tsc --noEmit');
+  assert.deepEqual(config.hooks.preCommit, [
+    { name: 'typecheck', command: 'npx tsc --noEmit', blocking: true, whenStaged: ['**/*.ts', '**/*.tsx'] },
+    {
+      name: 'lint',
+      command: 'npm run lint',
+      blocking: false,
+      whenStaged: ['**/*.{js,jsx,mjs,cjs,ts,tsx}'],
+    },
+  ]);
+});
+
+test('detect : mauvais dossier — sous-dossiers candidats (profondeur 1 et 2)', () => {
+  const dir = copyProject('parent-no-project');
+  assert.equal(isUnrecognizedTarget(dir), true);
+  assert.deepEqual(findNearbyProjects(dir), ['apps/tool-a', 'standalone']);
+});
+
+test('detect CLI : mauvais dossier + --write → n\'écrit rien, code 1, liste les candidats', () => {
+  const dir = copyProject('parent-no-project');
+  const res = cli(['detect', dir, '--write']);
+  assert.equal(res.status, 1);
+  assert.equal(exists(dir, 'acc.config.json'), false);
+  assert.match(res.stderr, /ne ressemble à aucun projet reconnu/);
+  assert.match(res.stderr, /apps\/tool-a/);
+  assert.match(res.stderr, /standalone/);
+  assert.ok(res.stderr.includes(STANDARD_COMMAND), 'la commande suggérée doit être exécutable telle quelle');
+});
+
+test('detect CLI : mauvais dossier sans --write → avertissement en plus de la proposition', () => {
+  const dir = copyProject('parent-no-project');
+  const res = cli(['detect', dir]);
+  assert.equal(res.status, 0);
+  assert.match(res.stderr, /ne ressemble à aucun projet reconnu/);
+  assert.equal(JSON.parse(res.stdout).project.name, 'parent-no-project');
 });
 
 test('detect CLI : --write écrit, refuse d\'écraser sans --force', () => {

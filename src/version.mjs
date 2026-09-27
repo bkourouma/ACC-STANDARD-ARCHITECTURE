@@ -13,6 +13,14 @@ export const STANDARD_VERSION = pkg.version;
 /** Commit d'extraction des gabarits (voir docs/CONTRACT.md). */
 export const SOURCE_COMMIT = '81313c5';
 
+/**
+ * Commande réellement exécutable à suggérer dans les messages qui invitent à
+ * relancer l'outil : l'outil n'est pas publié sur le registre npm, donc
+ * `acc-standard` seul ne fonctionne que si le paquet a été installé
+ * manuellement (voir README.md).
+ */
+export const STANDARD_COMMAND = 'npx github:bkourouma/ACC-STANDARD-ARCHITECTURE';
+
 /** Compare deux versions semver simples (x.y.z). Renvoie -1, 0 ou 1. */
 export function compareSemver(a, b) {
   const pa = parseSemver(a);
