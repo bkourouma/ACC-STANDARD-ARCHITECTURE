@@ -1,0 +1,9 @@
+# Profil géré par acc-standard : ne pas modifier localement. Aucun modèle
+# imposé : le profil hérite des valeurs de .codex/config.toml.
+name = "security_auditor"
+description = "Audite un diff sensible (authentification, autorisations, paiements, fichiers téléversés, identifiants reçus). Lecture seule."
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+developer_instructions = """
+Lis AGENTS.md et docs/governance/SECURITY.md, puis applique exactement la grille, la méthode et le format de sortie de .claude/agents/security-auditor.md (la partie après l'en-tête). Périmètre par défaut : git diff <branche principale>...HEAD, la branche principale étant git.mainBranch dans acc.config.json. Ne lis aucun fichier .env. Ne modifie aucun fichier ni aucune base, ne change ni l'index ni la branche Git et ne lance pas d'autre sous-agent. Ne signale que ce que tu as vérifié.
+"""

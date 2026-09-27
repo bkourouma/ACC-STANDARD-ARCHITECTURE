@@ -1,0 +1,23 @@
+# Hooks git (Lefthook), installés par node scripts/install-git-hooks.cjs.
+# Garde-fous communs à tous les agents et aux humains ; ne pas les contourner
+# (--no-verify, LEFTHOOK=0).
+{{#if stack.eslint}}
+pre-commit:
+  jobs:
+    - name: lint-staged
+      run: npx lint-staged
+
+{{else}}
+{{#if stack.prettier}}
+pre-commit:
+  jobs:
+    - name: lint-staged
+      run: npx lint-staged
+
+{{/if}}
+{{/if}}
+pre-push:
+  jobs:
+    - name: protected-branches
+      run: node scripts/pre-push-guard.cjs
+      use_stdin: true

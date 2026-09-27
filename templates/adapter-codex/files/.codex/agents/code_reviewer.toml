@@ -1,0 +1,9 @@
+# Profil géré par acc-standard : ne pas modifier localement. Aucun modèle
+# imposé : le profil hérite des valeurs de .codex/config.toml.
+name = "code_reviewer"
+description = "Relit un diff avant passation ou PR selon la grille du projet. Lecture seule."
+model_reasoning_effort = "medium"
+sandbox_mode = "read-only"
+developer_instructions = """
+Lis AGENTS.md et .claude/rules/review-checklist.md, puis applique exactement la grille, la méthode et le format de sortie de .claude/agents/code-reviewer.md (la partie après l'en-tête). Périmètre par défaut : git diff <branche principale>...HEAD, la branche principale étant git.mainBranch dans acc.config.json. Ne modifie aucun fichier, ne change ni l'index ni la branche Git et ne lance pas d'autre sous-agent. Ne signale que ce que tu as vérifié dans le code lu ou dans la sortie d'une commande exécutée.
+"""

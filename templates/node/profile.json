@@ -1,0 +1,16 @@
+{
+  "id": "node",
+  "description": "Projet Node : scripts et dépendances de développement du standard, lint-staged, Repomix, serveur MCP navigateur, CI GitHub Actions.",
+  "requires": ["base"],
+  "files": [
+    { "src": "package.json", "dest": "package.json", "mode": "merge-json", "render": true },
+    { "src": "repomix.config.json", "dest": "repomix.config.json", "mode": "seed" },
+    { "src": ".mcp.json", "dest": ".mcp.json", "mode": "merge-json" },
+    { "src": ".github/workflows/ci.yml", "dest": ".github/workflows/ci.yml", "mode": "seed", "render": true }
+  ],
+  "nextSteps": [
+    "Installer les nouvelles dépendances de développement (lefthook, repomix, chrome-devtools-mcp, lint-staged si configuré) ; le script prepare installe ensuite les hooks git.",
+    "Si package.json avait déjà un script prepare (ou lint-staged), la valeur existante est conservée : y ajouter à la main node scripts/install-git-hooks.cjs.",
+    "Relire .github/workflows/ci.yml (seed) : services (base de données…), variables et étapes propres au projet."
+  ]
+}

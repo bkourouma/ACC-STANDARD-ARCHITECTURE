@@ -1,0 +1,2 @@
+# Configuration Codex — {{project.name}}
+project = "{{project.slug}}"

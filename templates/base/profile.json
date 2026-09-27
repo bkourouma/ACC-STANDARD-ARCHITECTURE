@@ -1,0 +1,55 @@
+{
+  "id": "base",
+  "description": "Architecture agentique commune : consignes, processus, agents Claude, hooks, garde-fous git et bus d'agents.",
+  "requires": [],
+  "files": [
+    { "src": "AGENTS.md", "dest": "AGENTS.md", "mode": "block", "render": true },
+    { "src": "CLAUDE.md", "dest": "CLAUDE.md", "mode": "block", "render": true },
+
+    { "src": "docs/workflows/HANDOFF.md", "dest": "docs/workflows/HANDOFF.md", "mode": "seed", "render": true },
+    { "src": "docs/workflows/LEAD_PROCESS.md", "dest": "docs/workflows/LEAD_PROCESS.md", "mode": "managed" },
+    { "src": "docs/workflows/DEV_PROCESS.md", "dest": "docs/workflows/DEV_PROCESS.md", "mode": "managed" },
+    { "src": "docs/workflows/DEMO_DEBUG_PROCESS.md", "dest": "docs/workflows/DEMO_DEBUG_PROCESS.md", "mode": "managed" },
+    { "src": "docs/workflows/BUG_REPORT_TEMPLATE.md", "dest": "docs/workflows/BUG_REPORT_TEMPLATE.md", "mode": "managed" },
+    { "src": "docs/workflows/AGENT_ADAPTERS.md", "dest": "docs/workflows/AGENT_ADAPTERS.md", "mode": "managed" },
+    { "src": "docs/workflows/RUNBOOK.md", "dest": "docs/workflows/RUNBOOK.md", "mode": "seed", "render": true },
+    { "src": "docs/governance/CODING_STANDARDS.md", "dest": "docs/governance/CODING_STANDARDS.md", "mode": "seed", "render": true },
+    { "src": "docs/governance/SECURITY.md", "dest": "docs/governance/SECURITY.md", "mode": "seed", "render": true },
+    { "src": "docs/architecture/adr/ADR-000-template.md", "dest": "docs/architecture/adr/ADR-000-template.md", "mode": "seed", "render": true },
+
+    { "src": ".claude/settings.json", "dest": ".claude/settings.json", "mode": "merge-json", "render": true },
+    { "src": ".claude/hooks/validate-bash.sh", "dest": ".claude/hooks/validate-bash.sh", "mode": "managed", "executable": true },
+    { "src": ".claude/hooks/pre-commit.sh", "dest": ".claude/hooks/pre-commit.sh", "mode": "managed", "executable": true },
+
+    { "src": ".claude/agents/lead.md", "dest": ".claude/agents/lead.md", "mode": "managed" },
+    { "src": ".claude/agents/dev-orchestrator.md", "dest": ".claude/agents/dev-orchestrator.md", "mode": "managed" },
+    { "src": ".claude/agents/dev-simple.md", "dest": ".claude/agents/dev-simple.md", "mode": "managed" },
+    { "src": ".claude/agents/dev-complex.md", "dest": ".claude/agents/dev-complex.md", "mode": "managed" },
+    { "src": ".claude/agents/demo-orchestrator.md", "dest": ".claude/agents/demo-orchestrator.md", "mode": "managed" },
+    { "src": ".claude/agents/ui-tester.md", "dest": ".claude/agents/ui-tester.md", "mode": "managed" },
+    { "src": ".claude/agents/code-reviewer.md", "dest": ".claude/agents/code-reviewer.md", "mode": "managed" },
+    { "src": ".claude/agents/security-auditor.md", "dest": ".claude/agents/security-auditor.md", "mode": "managed" },
+
+    { "src": ".claude/rules/review-checklist.md", "dest": ".claude/rules/review-checklist.md", "mode": "seed", "render": true },
+
+    { "src": ".claude/skills/lead/SKILL.md", "dest": ".claude/skills/lead/SKILL.md", "mode": "managed" },
+    { "src": ".claude/skills/audit/SKILL.md", "dest": ".claude/skills/audit/SKILL.md", "mode": "managed" },
+    { "src": ".claude/skills/acc-adapt/SKILL.md", "dest": ".claude/skills/acc-adapt/SKILL.md", "mode": "managed" },
+    { "src": ".claude/skills/run-project/SKILL.md", "dest": ".claude/skills/run-{{project.slug}}/SKILL.md", "mode": "seed", "render": true },
+
+    { "src": "scripts/agent-bus.cjs", "dest": "scripts/agent-bus.cjs", "mode": "managed", "when": "options.agentBus" },
+    { "src": "scripts/pre-push-guard.cjs", "dest": "scripts/pre-push-guard.cjs", "mode": "managed" },
+    { "src": "scripts/install-git-hooks.cjs", "dest": "scripts/install-git-hooks.cjs", "mode": "managed" },
+
+    { "src": ".lefthook.yml", "dest": ".lefthook.yml", "mode": "seed", "render": true },
+    { "src": "gitignore", "dest": ".gitignore", "mode": "merge-lines" },
+    { "src": ".editorconfig", "dest": ".editorconfig", "mode": "seed" },
+    { "src": "gitattributes", "dest": ".gitattributes", "mode": "seed" }
+  ],
+  "nextSteps": [
+    "Installer les dépendances du projet (par exemple la commande `commands.install` d'acc.config.json) ; Lefthook doit être disponible.",
+    "Installer les hooks git : node scripts/install-git-hooks.cjs",
+    "Relire le diff : AGENTS.md, CLAUDE.md, .claude/settings.json et les fichiers seed contiennent des TODO(acc-adapt).",
+    "Lancer /acc-adapt dans Claude Code pour remplir les TODO(acc-adapt) à partir du code réel, puis npx github:bkourouma/ACC-STANDARD-ARCHITECTURE doctor."
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "id": "adapter-codex",
+  "description": "Adaptateur Codex de test",
+  "requires": ["base"],
+  "files": [{ "src": "config.toml", "dest": ".codex/config.toml", "mode": "managed", "render": true }]
+}

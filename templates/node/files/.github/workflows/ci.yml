@@ -1,0 +1,61 @@
+# Intégration continue de {{project.name}}, posée par acc-standard (seed :
+# propriété du projet après création). Les étapes reprennent les commandes
+# d'acc.config.json au moment de l'installation.
+# TODO(acc-adapt) : services (base de données…), variables d'environnement de
+# test sans secret réel, étapes propres au projet, cache du gestionnaire de
+# paquets.
+name: CI
+
+on:
+  push:
+    branches: [{{#if git.mainBranch}}{{git.mainBranch}}{{else}}main{{/if}}]
+  pull_request:
+
+concurrency:
+  group: $\{{ github.workflow }}-$\{{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Vérifications
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Rend pnpm et yarn disponibles s'ils sont déclarés dans package.json.
+      - name: Activer corepack
+        run: corepack enable
+{{#if commands.install}}
+
+      - name: Installer les dépendances
+        run: |
+          {{commands.install}}
+{{/if}}
+{{#if commands.typecheck}}
+
+      - name: Typecheck
+        run: |
+          {{commands.typecheck}}
+{{/if}}
+{{#if commands.lint}}
+
+      - name: Lint
+        run: |
+          {{commands.lint}}
+{{/if}}
+{{#if commands.test}}
+
+      - name: Tests
+        run: |
+          {{commands.test}}
+{{/if}}
+{{#if commands.build}}
+
+      - name: Build
+        run: |
+          {{commands.build}}
+{{/if}}

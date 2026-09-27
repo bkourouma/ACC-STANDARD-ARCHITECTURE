@@ -1,0 +1,25 @@
+{
+  "name": "acc-standard-architecture",
+  "version": "0.1.0",
+  "description": "Met à niveau un projet vers l'architecture agentique standard (agents, hooks, processus, garde-fous).",
+  "type": "module",
+  "bin": {
+    "acc-standard": "bin/acc-standard.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates",
+    "migrations",
+    "docs"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "check:generic": "node scripts/check-generic.mjs"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

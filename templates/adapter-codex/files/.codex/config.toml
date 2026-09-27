@@ -1,0 +1,26 @@
+# Configuration Codex du projet, posée par acc-standard (seed : propriété du
+# projet après création). Les rôles et contrats sont dans AGENTS.md et
+# docs/workflows/ ; voir docs/workflows/AGENT_ADAPTERS.md.
+#
+# Modèles : aucun n'est imposé par le standard. Renseigner ceux qui sont
+# disponibles : `model` pour les sessions principales (Pilote, coordinateurs),
+# `default_subagent_model` pour les agents lancés par elles. Les profils de
+# .codex/agents/ sont gérés par le standard et ne fixent pas de modèle : ils
+# héritent de ces deux valeurs. Sans valeur, Codex applique son modèle par
+# défaut.
+#
+# model = "<modèle des coordinateurs>"
+model_reasoning_effort = "medium"
+
+# Pas de demande d'approbation, mais écritures cantonnées à l'espace de
+# travail. Les hooks Claude de .claude/ ne s'appliquent pas à Codex : les
+# garde-fous communs sont les hooks git Lefthook (pre-commit, pre-push) et la
+# CI.
+approval_policy = "never"
+sandbox_mode = "workspace-write"
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 6
+# default_subagent_model = "<modèle des agents de réalisation>"
+default_subagent_reasoning_effort = "medium"

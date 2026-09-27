@@ -1,0 +1,15 @@
+{
+  "id": "base",
+  "description": "Profil de test : un fichier par mode",
+  "requires": [],
+  "files": [
+    { "src": "AGENTS.md", "dest": "AGENTS.md", "mode": "block", "render": true },
+    { "src": "validate-bash.sh", "dest": ".claude/hooks/validate-bash.sh", "mode": "managed", "executable": true },
+    { "src": "HANDOFF.md", "dest": "docs/workflows/HANDOFF.md", "mode": "seed", "render": true },
+    { "src": "settings.json", "dest": ".claude/settings.json", "mode": "merge-json" },
+    { "src": "gitignore", "dest": ".gitignore", "mode": "merge-lines" },
+    { "src": "agent-bus.cjs", "dest": "scripts/agent-bus.cjs", "mode": "managed", "when": "options.agentBus" },
+    { "src": "notes.md", "dest": "docs/{{project.slug}}-notes.md", "mode": "seed", "render": true }
+  ],
+  "nextSteps": ["Lancer /acc-adapt dans Claude Code"]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "adapter-codex",
+  "description": "Adaptateur Codex : configuration de projet et profils d'agents reprenant les rôles des contrats de processus.",
+  "requires": ["base"],
+  "files": [
+    { "src": ".codex/config.toml", "dest": ".codex/config.toml", "mode": "seed" },
+    { "src": ".codex/agents/dev_orchestrator.toml", "dest": ".codex/agents/dev_orchestrator.toml", "mode": "managed" },
+    { "src": ".codex/agents/demo_orchestrator.toml", "dest": ".codex/agents/demo_orchestrator.toml", "mode": "managed" },
+    { "src": ".codex/agents/dev_complex.toml", "dest": ".codex/agents/dev_complex.toml", "mode": "managed" },
+    { "src": ".codex/agents/dev_simple.toml", "dest": ".codex/agents/dev_simple.toml", "mode": "managed" },
+    { "src": ".codex/agents/ui_tester.toml", "dest": ".codex/agents/ui_tester.toml", "mode": "managed" },
+    { "src": ".codex/agents/code_reviewer.toml", "dest": ".codex/agents/code_reviewer.toml", "mode": "managed" },
+    { "src": ".codex/agents/security_auditor.toml", "dest": ".codex/agents/security_auditor.toml", "mode": "managed" }
+  ],
+  "nextSteps": [
+    "Renseigner les modèles Codex dans .codex/config.toml (seed) selon les modèles disponibles ; les profils .codex/agents/ héritent de ces valeurs.",
+    "Les hooks .claude/ ne s'appliquent pas à Codex : vérifier que les hooks git Lefthook sont installés (npx github:bkourouma/ACC-STANDARD-ARCHITECTURE doctor)."
+  ]
+}

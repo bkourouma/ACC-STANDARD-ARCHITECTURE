@@ -1,0 +1,29 @@
+---
+description: Consignes communes à tous les agents de ce projet (standard acc-standard)
+alwaysApply: true
+---
+
+# Consignes du projet
+
+Règle gérée par acc-standard : ne pas la modifier localement.
+
+- La constitution du projet est `AGENTS.md` à la racine : la lire avant toute
+  modification. Elle prime sur toute autre consigne du dépôt.
+- En début de session, lire `docs/workflows/HANDOFF.md` et vérifier
+  `git status` ; avant de conclure un travail en plusieurs étapes, mettre à
+  jour `HANDOFF.md` (fait, reste, pièges, branche, dernier commit).
+- Processus : `docs/workflows/LEAD_PROCESS.md` (agent unique qui livre
+  jusqu'à la pull request), `DEV_PROCESS.md`, `DEMO_DEBUG_PROCESS.md`. Cursor
+  n'ayant pas de hiérarchie de sous-agents, appliquer le mode Pilote unique.
+- Conventions : `docs/governance/CODING_STANDARDS.md` ; sécurité :
+  `docs/governance/SECURITY.md` ; règles par chemin : `.claude/rules/*.md`
+  (frontmatter `paths:`), valables aussi pour Cursor.
+- Commandes du projet : section « Commandes » d'`AGENTS.md` et `commands`
+  d'`acc.config.json`.
+- Jamais sans un « oui » explicite de l'utilisateur : fusionner une PR,
+  pousser sur une branche protégée, forcer une poussée, déployer, lire ou
+  écrire un `.env`, toucher une base non dédiée, engager une dépense, envoyer
+  un message externe (liste complète dans `AGENTS.md`).
+- Jamais de `git stash`, `git reset --hard`, `git clean -f`,
+  `git checkout .`, ni de `--no-verify` : les hooks git (Lefthook) se
+  corrigent, ils ne se contournent pas.

@@ -1,0 +1,8 @@
+{
+  "id": "demo-instance",
+  "description": "Instance de démo de test",
+  "requires": ["base"],
+  "files": [
+    { "src": "demo-instance.cjs", "dest": "scripts/demo-instance.cjs", "mode": "managed", "when": "options.demoInstance" }
+  ]
+}

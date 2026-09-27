@@ -1,0 +1,13 @@
+{
+  "name": "@acme/monorepo",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "npm run dev --workspaces",
+    "typecheck": "tsc -b",
+    "test": "npm test --workspaces"
+  },
+  "devDependencies": {
+    "prettier": "^3.0.0"
+  }
+}

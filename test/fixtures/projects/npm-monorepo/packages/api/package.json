@@ -1,0 +1,4 @@
+{
+  "name": "@acme/api",
+  "dependencies": { "@prisma/client": "^5.0.0" }
+}

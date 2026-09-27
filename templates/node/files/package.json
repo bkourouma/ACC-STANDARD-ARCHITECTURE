@@ -1,0 +1,48 @@
+{
+  "scripts": {
+    "prepare": "node scripts/install-git-hooks.cjs",
+{{#if options.agentBus}}
+    "agent-bus": "node scripts/agent-bus.cjs",
+{{/if}}
+    "repomix": "repomix"
+  },
+{{#if stack.eslint}}
+{{#if stack.prettier}}
+  "lint-staged": {
+    "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}": [
+      "node node_modules/prettier/bin/prettier.cjs --write",
+      "node node_modules/eslint/bin/eslint.js --fix"
+    ],
+    "*.{json,md,yml,yaml,css,scss,html}": [
+      "node node_modules/prettier/bin/prettier.cjs --write"
+    ]
+  },
+{{else}}
+  "lint-staged": {
+    "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}": [
+      "node node_modules/eslint/bin/eslint.js --fix"
+    ]
+  },
+{{/if}}
+{{else}}
+{{#if stack.prettier}}
+  "lint-staged": {
+    "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,md,yml,yaml,css,scss,html}": [
+      "node node_modules/prettier/bin/prettier.cjs --write"
+    ]
+  },
+{{/if}}
+{{/if}}
+  "devDependencies": {
+{{#if stack.eslint}}
+    "lint-staged": "^17.5.0",
+{{else}}
+{{#if stack.prettier}}
+    "lint-staged": "^17.5.0",
+{{/if}}
+{{/if}}
+    "chrome-devtools-mcp": "^0.10.1",
+    "lefthook": "^2.1.14",
+    "repomix": "^1.14.0"
+  }
+}

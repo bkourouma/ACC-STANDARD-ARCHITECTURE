@@ -1,0 +1,10 @@
+.agent-bus/
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/worktrees/
+*.acc-new
+*.acc-bak
+repomix-output*
+.env
+.env.*
+!.env.example

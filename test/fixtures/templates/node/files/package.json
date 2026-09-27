@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "test": "node --test",
+    "agent-bus": "node scripts/agent-bus.cjs"
+  },
+  "devDependencies": {
+    "lefthook": "^1.7.0"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "adapter-cursor",
+  "description": "Adaptateur Cursor : règle toujours active qui renvoie à AGENTS.md et aux contrats de processus.",
+  "requires": ["base"],
+  "files": [
+    { "src": ".cursor/rules/acc-standard.mdc", "dest": ".cursor/rules/acc-standard.mdc", "mode": "managed" }
+  ],
+  "nextSteps": [
+    "Les hooks .claude/ ne s'appliquent pas à Cursor : vérifier que les hooks git Lefthook sont installés (npx github:bkourouma/ACC-STANDARD-ARCHITECTURE doctor)."
+  ]
+}

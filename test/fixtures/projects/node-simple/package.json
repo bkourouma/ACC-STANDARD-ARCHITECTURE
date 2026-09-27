@@ -1,0 +1,16 @@
+{
+  "name": "node-simple",
+  "version": "1.0.0",
+  "description": "Projet Node simple",
+  "scripts": {
+    "dev": "node src/index.js",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "typescript": "^5.0.0"
+  }
+}

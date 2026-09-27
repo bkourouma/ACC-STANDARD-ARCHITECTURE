@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/validate-bash.sh\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-commit.sh\"",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+{{#if commands.typecheck}}
+      "Bash({{commands.typecheck}}*)",
+{{/if}}
+{{#if commands.lint}}
+      "Bash({{commands.lint}}*)",
+{{/if}}
+{{#if commands.test}}
+      "Bash({{commands.test}}*)",
+{{/if}}
+{{#if commands.build}}
+      "Bash({{commands.build}}*)",
+{{/if}}
+{{#if options.agentBus}}
+      "Bash(node scripts/agent-bus.cjs*)",
+{{/if}}
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git worktree list*)",
+      "Bash(git remote -v)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/.env.production)",
+      "Read(**/.env.development)",
+      "Read(**/.env.test)",
+      "Edit(**/.env)",
+      "Edit(**/.env.local)",
+      "Edit(**/.env.*.local)",
+      "Edit(**/.env.production)",
+      "Edit(**/.env.development)",
+      "Edit(**/.env.test)",
+      "Write(**/.env)",
+      "Write(**/.env.local)",
+      "Write(**/.env.*.local)",
+      "Write(**/.env.production)",
+      "Write(**/.env.development)",
+      "Write(**/.env.test)",
+{{#if git.protectedBranches}}
+{{#each git.protectedBranches}}
+      "Bash(git push origin {{this}})",
+      "Bash(git push origin HEAD:{{this}})",
+{{/each}}
+{{else}}
+      "Bash(git push origin main)",
+      "Bash(git push origin HEAD:main)",
+      "Bash(git push origin master)",
+      "Bash(git push origin HEAD:master)",
+{{/if}}
+      "Bash(git push --force*)",
+      "Bash(git push -f)",
+      "Bash(git push -f *)",
+      "Bash(git commit --no-verify*)",
+      "Bash(git push --no-verify*)",
+      "Bash(git clean -f*)",
+      "Bash(git clean -fd*)",
+      "Bash(git clean -x*)",
+      "Bash(git stash)",
+      "Bash(git stash push*)",
+      "Bash(git stash pop*)",
+      "Bash(git stash drop*)",
+      "Bash(git stash clear*)",
+      "Bash(git stash save*)",
+      "Bash(git reset --hard*)",
+      "Bash(git checkout -- .)",
+      "Bash(git checkout .)",
+      "Bash(git restore .)",
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf .git*)",
+      "Bash(rm -rf node_modules)",
+      "Bash(rm -rf ./node_modules)"
+    ]
+  }
+}

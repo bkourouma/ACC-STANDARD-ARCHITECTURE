@@ -1,0 +1,13 @@
+{
+  "id": "demo-instance",
+  "description": "Instance de démo figée : worktree détaché sur une révision, piloté par la clé demo d'acc.config.json.",
+  "requires": ["base"],
+  "files": [
+    { "src": "scripts/demo-instance.cjs", "dest": "scripts/demo-instance.cjs", "mode": "managed" }
+  ],
+  "nextSteps": [
+    "Renseigner la clé demo d'acc.config.json (schéma en tête de scripts/demo-instance.cjs) : liens, fichiers copiés, garde de ressource dédiée, commandes, URL de santé.",
+    "Créer soi-même les fichiers de configuration de démo (les agents ne touchent pas aux .env), avec une base de données dédiée.",
+    "Premier essai : node scripts/demo-instance.cjs sync HEAD, puis node scripts/demo-instance.cjs status ; ajouter si besoin des scripts demo:sync et demo:status au gestionnaire de paquets."
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "node",
+  "description": "Fragments Node de test",
+  "requires": ["base"],
+  "files": [
+    { "src": "package.json", "dest": "package.json", "mode": "merge-json" },
+    { "src": "gitignore", "dest": ".gitignore", "mode": "merge-lines" }
+  ],
+  "nextSteps": ["Lancer npm install"]
+}
