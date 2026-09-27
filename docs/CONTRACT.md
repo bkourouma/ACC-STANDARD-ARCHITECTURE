@@ -18,6 +18,13 @@ commit `81313c5`.
 - Les scripts livrés dans les gabarits (`.cjs`, `.sh`) tournent dans le projet
   cible : CommonJS, zéro dépendance, Node 20 ; bash compatible Git Bash, sans
   `jq`.
+- Chaque script `.cjs` livré porte, juste après le shebang, l'en-tête
+  `/* eslint-disable -- … */` : les `require()` voulus d'un script CommonJS
+  ne doivent pas faire échouer le lint du projet cible (par exemple
+  `@typescript-eslint/no-require-imports` d'`eslint-config-next`). La
+  désactivation est globale et non ciblée : citer une règle d'un greffon
+  absent du projet ferait échouer ESLint (« Definition for rule … was not
+  found »).
 
 ## 2. `acc.config.json` (à la racine du projet cible, commité)
 
@@ -142,6 +149,16 @@ profils visent la même `dest`, c'est une erreur de gabarit sauf en mode
 | ---------------- | ---------------------------------------------------------- |
 | `base`           | AGENTS.md, CLAUDE.md, docs/workflows, .claude (agents, hooks, rules, skills, settings), scripts git et bus, .lefthook.yml, .gitignore, .editorconfig, .gitattributes |
 | `node`           | fragments package.json (scripts, devDependencies, lint-staged), repomix, .mcp.json, CI GitHub Actions |
+
+Script `prepare` du fragment `node` : il ne lance
+`scripts/install-git-hooks.cjs` que si le fichier existe
+(`node -e "require('fs').existsSync(…)&&require(…)"`), pour ne pas casser
+une installation où `scripts/` n'est pas encore copié (image Docker qui ne
+copie que `package*.json` avant `npm install`). Une commande vide dans
+`commands` (par exemple `commands.test`) est gérée explicitement par les
+gabarits qui l'utilisent : la CI rend une étape d'avertissement visible au
+lieu d'omettre silencieusement les tests, et `/audit` le signale comme
+vérification non faite.
 | `adapter-codex`  | .codex/config.toml, .codex/agents/*.toml                   |
 | `adapter-cursor` | .cursor/rules/acc-standard.mdc                             |
 | `demo-instance`  | scripts/demo-instance.cjs piloté par `config.demo`         |
@@ -153,8 +170,8 @@ SHA-256 hexadécimal du contenu normalisé.
 
 | Mode          | Cible absente | Cible présente |
 | ------------- | ------------- | -------------- |
-| `managed`     | créer | si contenu = nouveau → rien ; sinon si `hash(actuel)` = hash du manifeste → remplacer ; sinon **conflit** : écrire `<dest>.acc-new`, ne pas toucher `<dest>` (avec `--force` : copier `<dest>` en `<dest>.acc-bak` puis remplacer) |
-| `block`       | créer (fichier rendu complet) | pour chaque bloc du gabarit : bloc présent dans la cible → remplacer son contenu si son hash actuel = hash du manifeste (ou s'il n'y a pas d'entrée et que le contenu est identique), sinon conflit de bloc ; bloc absent → l'ajouter en fin de fichier précédé d'une ligne vide. Les blocs de la cible absents du gabarit sont laissés tels quels. En cas de conflit : écrire `<dest>.acc-new` (fichier proposé complet) et ne rien modifier dans `<dest>` |
+| `managed`     | créer | si contenu = nouveau → rien ; sinon si `hash(actuel)` = hash du manifeste → remplacer ; sinon **conflit** : écrire `<dest>.acc-new`, ne pas toucher `<dest>` (avec `--force`, ou `--adopt` si le fichier n'a jamais été repris — voir ci-dessous : copier `<dest>` en `<dest>.acc-bak` puis remplacer) |
+| `block`       | créer (fichier rendu complet) | pour chaque bloc du gabarit : bloc présent dans la cible → remplacer son contenu si son hash actuel = hash du manifeste (ou s'il n'y a pas d'entrée et que le contenu est identique), sinon conflit de bloc ; bloc absent → l'ajouter en fin de fichier précédé d'une ligne vide. Les blocs de la cible absents du gabarit sont laissés tels quels. En cas de conflit : écrire `<dest>.acc-new` (fichier proposé complet) et ne rien modifier dans `<dest>` (même règle `--force` / `--adopt` que `managed`). Écrit en plus le squelette `.acc/skeletons/<dest>`, voir ci-dessous |
 | `seed`        | créer | ne jamais toucher |
 | `merge-json`  | créer (JSON du fragment) | fusion profonde, voir ci-dessous |
 | `merge-lines` | créer | ajouter les lignes absentes à la fin, sous un en-tête `# acc-standard` ajouté une seule fois |
@@ -181,6 +198,30 @@ Le contenu d'un bloc = texte strictement entre les deux lignes marqueurs. Le
 texte hors blocs d'un gabarit `block` n'est utilisé qu'à la création : il est
 ensuite la propriété du projet (et contient des `TODO(acc-adapt)` que la
 compétence `/acc-adapt` remplace).
+
+Squelette d'un fichier `block` déjà présent : quand la cible existe avant
+que le standard l'ait repris (aucune entrée au manifeste pour `<dest>`) et
+qu'elle diffère du fichier rendu, le moteur n'y ajoute que les blocs ; le
+texte hors blocs du gabarit (tables, sections « Structure », « Commandes »,
+`TODO(acc-adapt)`…) serait perdu. Il écrit donc le fichier rendu complet
+dans `.acc/skeletons/<dest>` (même chemin relatif sous `.acc/skeletons/`).
+Ce squelette appartient au moteur et n'est jamais une destination de
+gabarit ; la compétence `/acc-adapt` y reprend les sections absentes de
+`<dest>` (hors blocs, avec leurs `TODO(acc-adapt)`), puis le supprime. Aux
+`apply` suivants (entrée présente au manifeste), un squelette encore présent
+est tenu à jour ; un squelette supprimé n'est pas recréé. `doctor` signale
+les squelettes en attente.
+
+Adoption (`--adopt`) d'un projet déjà équipé : un fichier `managed` ou
+`block` en conflit **qui n'a jamais été repris par le standard** — pas
+d'entrée au manifeste, ou entrée sans `hash` (`managed`) ou sans hash pour
+chaque bloc en conflit (`block`) — est traité comme avec `--force` : copie en
+`<dest>.acc-bak`, puis version du standard posée. Un fichier déjà repris puis
+modifié localement reste un conflit (`.acc-new`) ; un `block` aux marqueurs
+invalides aussi. Le plan affiche `adopté, sauvegarde <dest>.acc-bak`.
+L'utilisateur relit ensuite `git diff` (le dépôt était propre) et reporte ce
+qui doit l'être (fichiers `seed`, hors blocs) ou propose une évolution du
+standard.
 
 Fusion `merge-json` :
 
@@ -221,10 +262,10 @@ pas été repris par le standard).
 
 ```text
 acc-standard detect [cible] [--write] [--force]
-acc-standard plan   [cible] [--json]
-acc-standard apply  [cible] [--branch] [--allow-dirty] [--force] [--dry-run]
+acc-standard plan   [cible] [--json] [--adopt]
+acc-standard apply  [cible] [--branch] [--allow-dirty] [--force] [--adopt] [--dry-run]
 acc-standard doctor [cible] [--json]
-acc-standard update [cible] [--allow-dirty] [--force]
+acc-standard update [cible] [--allow-dirty] [--force] [--adopt]
 acc-standard --help | --version
 Options communes : --templates <dossier> (défaut templates/ du paquet,
 ou variable ACC_TEMPLATES_DIR)
@@ -245,6 +286,26 @@ ou variable ACC_TEMPLATES_DIR)
     `hooks.preCommit` reçoit le contrôle bloquant correspondant
     (`whenStaged: ["**/*.ts", "**/*.tsx"]`). Le contrôle `lint` (non
     bloquant) reçoit par défaut `whenStaged: ["**/*.{js,jsx,mjs,cjs,ts,tsx}"]`.
+  - Next.js ≥ 16 (version majeure lue dans la dépendance `next` du
+    `package.json` racine) : le `typecheck` implicite devient
+    `npx next typegen && npx tsc --noEmit`, car `tsc` a besoin des types de
+    routes générés par Next. Si un script `typecheck` existe sans mentionner
+    `typegen`, un avertissement le signale (le script est gardé tel quel).
+  - Scripts `prebuild` ou `predev` présents : avertissement — s'ils génèrent
+    des fichiers requis par `tsc` ou par les tests, `commands.typecheck`, les
+    contrôles `hooks.preCommit` et la CI doivent les lancer d'abord.
+  - `Dockerfile` (ou `Dockerfile.*`, `*.Dockerfile`) à la racine ou dans un
+    workspace, pour un projet Node : avertissement sur le script `prepare`
+    (il tourne pendant l'installation des dépendances de l'image, souvent
+    avant la copie de `scripts/`).
+  - `ports`, dans cet ordre, sans écraser une clé déjà trouvée : variables
+    `PORT` / `<NOM>_PORT` des `.env.example` / `env.example` (racine puis
+    workspaces ; jamais un `.env` réel) ; `configurations[].port` de
+    `.claude/launch.json` (clé = `name` réduit en slug, `app` à défaut) ; port
+    par défaut du cadriciel de chaque paquet — Next.js 3000, Vite 5173 — ou
+    celui passé par `-p` / `--port` dans son script `dev` (clé `app` à la
+    racine, nom du dossier pour un workspace), sauf si ce numéro figure déjà
+    dans `ports`.
   - Si la cible ne ressemble à aucun projet reconnu (aucun de `package.json`,
     `pyproject.toml`, `requirements.txt`, `go.mod`, `Cargo.toml`, aucun dépôt
     git) **et** qu'un vrai projet existe dans un sous-dossier direct
@@ -266,16 +327,22 @@ ou variable ACC_TEMPLATES_DIR)
 - `apply` refuse un dépôt git sale (`git status --porcelain` non vide) ou
   l'absence de dépôt git, sauf `--allow-dirty`. `--branch` crée
   `chore/acc-standard-v<version>` (`git switch -c`) avant d'écrire.
-  `--dry-run` = `plan`. Ne lance jamais `git add`, `commit`, `push`. Écrit le
-  manifeste, puis affiche les `nextSteps` des profils et la commande de commit
-  suggérée.
+  `--dry-run` = `plan`. `--adopt` : adoption d'un projet déjà équipé (§5).
+  Ne lance jamais `git add`, `commit`, `push`. Écrit le manifeste, puis
+  affiche les squelettes écrits, les fichiers adoptés, les `nextSteps` des
+  profils et la commande de commit suggérée.
 - `doctor` : config valide, manifeste présent, fichiers du manifeste présents,
   dérive des `managed` (modifiés localement), `.acc-new` en attente, hooks git
   installés (`.git/hooks/pre-commit` et `pre-push` mentionnent lefthook), hooks
-  Claude déclarés dans `.claude/settings.json`, version du standard.
+  Claude déclarés dans `.claude/settings.json`, version du standard. En
+  avertissement (sans échec) : squelettes `.acc/skeletons/` en attente, et
+  script `prepare` du `package.json` qui lance directement
+  `node scripts/install-git-hooks.cjs` (forme fragile des projets équipés
+  avant la forme tolérante du fragment `node`, voir §4).
 - `update` : exécute `migrations/<version>.mjs` pour chaque version strictement
   supérieure à `config.standardVersion` et inférieure ou égale à la version du
-  paquet (ordre semver), puis `apply`, puis met `standardVersion` à jour.
+  paquet (ordre semver), puis `apply` (avec `--force` / `--adopt` s'ils sont
+  donnés), puis met `standardVersion` à jour.
   Signature d'une migration :
   `export default async function migrate({ target, config, log }) {}` ; elle
   peut renommer ou supprimer des fichiers **gérés** et modifier `config`

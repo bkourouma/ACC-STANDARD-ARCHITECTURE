@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "prepare": "node scripts/install-git-hooks.cjs",
+    "prepare": "node -e \"require('fs').existsSync('scripts/install-git-hooks.cjs')&&require('./scripts/install-git-hooks.cjs')\"",
 {{#if options.agentBus}}
     "agent-bus": "node scripts/agent-bus.cjs",
 {{/if}}

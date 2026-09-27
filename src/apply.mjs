@@ -46,16 +46,16 @@ function executeItem(item) {
  * @returns {{ plan, branch, manifestWritten, exitCode, output }}
  */
 export function applyStandard(target, options) {
-  const { templatesDir, allowDirty = false, force = false, branch = false, dryRun = false } = options;
+  const { templatesDir, allowDirty = false, force = false, adopt = false, branch = false, dryRun = false } = options;
   if (dryRun) {
-    const plan = computePlan(target, { templatesDir, force });
+    const plan = computePlan(target, { templatesDir, force, adopt });
     return { plan, exitCode: plan.conflicts ? 2 : 0, output: formatPlan(plan) };
   }
   assertCleanRepo(target, allowDirty);
   // Calcul avant toute écriture : une erreur de gabarit n'écrit rien.
-  let plan = computePlan(target, { templatesDir, force });
+  let plan = computePlan(target, { templatesDir, force, adopt });
   const createdBranch = branch ? createBranch(target) : null;
-  if (createdBranch) plan = computePlan(target, { templatesDir, force });
+  if (createdBranch) plan = computePlan(target, { templatesDir, force, adopt });
   for (const item of plan.items) executeItem(item);
   const files = Object.fromEntries(plan.items.map((i) => [i.dest, i.entry]));
   const manifestWritten = writeManifest(target, files, plan.manifest);
@@ -77,7 +77,23 @@ function formatApplyReport(plan, branch, manifestWritten) {
     lines.push(
       '',
       `${plan.conflicts} conflit(s) : comparez chaque fichier avec son .acc-new, reportez ce qui doit l'être,`,
-      'supprimez le .acc-new, puis relancez apply (ou --force pour remplacer avec sauvegarde .acc-bak).',
+      'supprimez le .acc-new, puis relancez apply (ou --force pour remplacer avec sauvegarde .acc-bak ;',
+      '--adopt pour un projet déjà équipé : seuls les fichiers jamais repris par le standard sont remplacés).',
+    );
+  }
+  if (plan.adopted.length) {
+    lines.push(
+      '',
+      `${plan.adopted.length} fichier(s) adopté(s) : version du standard posée, version locale en .acc-bak.`,
+      "Relisez git diff et reportez ce qui doit l'être (fichiers seed, hors blocs) ou proposez-le au standard.",
+    );
+  }
+  if (plan.skeletons.length) {
+    lines.push(
+      '',
+      'Squelette(s) des fichiers déjà présents (sections hors blocs non posées) :',
+      ...plan.skeletons.map((s) => `  - ${s}`),
+      '/acc-adapt y reprend les sections absentes (TODO(acc-adapt)) puis les supprime.',
     );
   }
   if (plan.nextSteps.length) {

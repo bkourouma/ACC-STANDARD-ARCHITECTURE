@@ -10,7 +10,7 @@
   ],
   "nextSteps": [
     "Installer les nouvelles dépendances de développement (lefthook, repomix, chrome-devtools-mcp, lint-staged si configuré) ; le script prepare installe ensuite les hooks git.",
-    "Si package.json avait déjà un script prepare (ou lint-staged), la valeur existante est conservée : y ajouter à la main node scripts/install-git-hooks.cjs.",
+    "Si package.json avait déjà un script prepare (ou lint-staged), la valeur existante est conservée : y ajouter à la main l'installation des hooks sous une forme qui tolère l'absence du fichier (image Docker qui ne copie que package*.json), par exemple node -e \"require('fs').existsSync('scripts/install-git-hooks.cjs')&&require('./scripts/install-git-hooks.cjs')\" ; doctor signale la forme fragile.",
     "Relire .github/workflows/ci.yml (seed) : services (base de données…), variables et étapes propres au projet."
   ]
 }

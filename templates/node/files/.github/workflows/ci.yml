@@ -52,6 +52,14 @@ jobs:
       - name: Tests
         run: |
           {{commands.test}}
+{{else}}
+
+      # TODO(acc-adapt) : commands.test est vide dans acc.config.json (aucune
+      # commande de test). Remplacer cette étape par les tests du projet dès
+      # qu'ils existent.
+      - name: Tests (aucune commande configurée)
+        run: |
+          echo "::warning title=Tests absents::commands.test est vide dans acc.config.json : aucun test automatisé n'a été lancé."
 {{/if}}
 {{#if commands.build}}
 

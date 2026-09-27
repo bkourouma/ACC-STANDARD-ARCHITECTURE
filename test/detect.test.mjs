@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { validateConfig } from '../src/config.mjs';
-import { detectProject, findNearbyProjects, isUnrecognizedTarget } from '../src/detect.mjs';
+import { detectProject, findNearbyProjects, isUnrecognizedTarget, majorVersion } from '../src/detect.mjs';
 import { STANDARD_COMMAND, STANDARD_VERSION } from '../src/version.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import { cli, commitAll, copyProject, exists, git, gitInit, read } from './helpers.mjs';
+import { cli, commitAll, copyProject, exists, git, gitInit, read, tmpDir, write } from './helpers.mjs';
 
 test('detect : projet Node simple', () => {
   const dir = copyProject('node-simple');
@@ -174,3 +174,69 @@ test('detect CLI : --write écrit, refuse d\'écraser sans --force', () => {
   assert.equal(cli(['detect', dir, '--write', '--force']).status, 0);
 });
 
+
+test('majorVersion : plages usuelles de dépendance', () => {
+  assert.equal(majorVersion('16.3.6'), 16);
+  assert.equal(majorVersion('^16.0.1'), 16);
+  assert.equal(majorVersion('~15.2'), 15);
+  assert.equal(majorVersion('>=16'), 16);
+  assert.equal(majorVersion('latest'), null);
+  assert.equal(majorVersion('workspace:*'), null);
+  assert.equal(majorVersion(undefined), null);
+});
+
+test('detect : Next.js 16 — typegen, ports du cadriciel et de launch.json, avertissements', () => {
+  const dir = copyProject('next-app');
+  const { config, warnings } = detectProject(dir);
+  assert.deepEqual(validateConfig(config), []);
+  assert.equal(config.commands.typecheck, 'npx next typegen && npx tsc --noEmit');
+  assert.equal(config.hooks.preCommit[0].command, 'npx next typegen && npx tsc --noEmit');
+  // launch.json d'abord (clé = nom en slug), puis port par défaut de Next.
+  assert.deepEqual(config.ports, { storybook: 6006, app: 3000 });
+  assert.equal(warnings.length, 2, warnings.join('\n'));
+  assert.match(warnings[0], /prebuild \(« node scripts\/gen-data\.mjs »\), predev/);
+  assert.match(warnings[0], /commands\.typecheck/);
+  assert.match(warnings[1], /^Dockerfile détecté/);
+  assert.match(warnings[1], /prepare/);
+});
+
+test('detect : Next.js 16 avec script typecheck sans typegen → gardé, avertissement', () => {
+  const dir = copyProject('next-app');
+  const pkg = JSON.parse(read(dir, 'package.json'));
+  pkg.scripts.typecheck = 'tsc --noEmit';
+  write(dir, 'package.json', JSON.stringify(pkg));
+  const { config, warnings } = detectProject(dir);
+  assert.equal(config.commands.typecheck, 'npm run typecheck');
+  assert.ok(warnings.some((w) => /next typegen/.test(w) && /tsc --noEmit/.test(w)), warnings.join('\n'));
+});
+
+test('detect : Next.js 15 → tsc seul ; port -p du script dev', () => {
+  const dir = copyProject('next-app');
+  const pkg = JSON.parse(read(dir, 'package.json'));
+  pkg.dependencies.next = '^15.5.0';
+  pkg.scripts.dev = 'next dev -p 3100';
+  write(dir, 'package.json', JSON.stringify(pkg));
+  fs.rmSync(path.join(dir, '.claude'), { recursive: true });
+  const { config } = detectProject(dir);
+  assert.equal(config.commands.typecheck, 'npx tsc --noEmit');
+  assert.deepEqual(config.ports, { app: 3100 });
+});
+
+test('detect : ports Vite (défaut, --port, pas de doublon avec .env.example)', () => {
+  const vite = (dev, env) => {
+    const dir = path.join(tmpDir('acc-vite-'), 'vite-app');
+    write(dir, 'package.json', JSON.stringify({ name: 'vite-app', scripts: { dev }, devDependencies: { vite: '^7.0.0' } }));
+    if (env) write(dir, '.env.example', env);
+    return detectProject(dir).config.ports;
+  };
+  assert.deepEqual(vite('vite'), { app: 5173 });
+  assert.deepEqual(vite('vite --port=4000'), { app: 4000 });
+  assert.deepEqual(vite('vite', 'WEB_PORT=5173\n'), { web: 5173 }, 'même numéro : pas de clé en double');
+  assert.deepEqual(vite('vite', 'PORT=8080\n'), { app: 8080 }, 'la clé venue de .env.example gagne');
+});
+
+test('detect : launch.json illisible ignoré, sans erreur', () => {
+  const dir = copyProject('next-app');
+  write(dir, '.claude/launch.json', '{ pas du json');
+  assert.deepEqual(detectProject(dir).config.ports, { app: 3000 });
+});

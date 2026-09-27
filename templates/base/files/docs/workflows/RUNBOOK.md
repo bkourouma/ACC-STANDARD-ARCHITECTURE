@@ -75,13 +75,23 @@ node scripts/agent-bus.cjs list --state "prêt au retest"
 
 Un `git worktree` n'a pas ses propres dépendances installées : les hooks git
 (Lefthook, lint-staged) et les commandes du projet y échouent tant qu'elles ne
-sont pas résolvables. Avant tout `git commit` dans un worktree, soit installer
-les dépendances dans le worktree, soit poser un lien vers celles du checkout
-principal (sous Windows, une jonction :
-`mklink /J "<worktree>\node_modules" "<checkout principal>\node_modules"`).
+sont pas résolvables. Avant tout `git commit` dans un worktree, installer les
+dépendances dans le worktree (choix par défaut, toujours sûr).
 
-TODO(acc-adapt) : préciser les dossiers de dépendances du projet et les
-artefacts générés qu'un lien partagé désynchronise.
+Un lien vers les dépendances du checkout principal (sous Windows, une
+jonction : `mklink /J "<worktree>\node_modules" "<checkout principal>\node_modules"`)
+évite une installation, mais seulement pour des outils qui suivent les liens
+sans vérifier où ils mènent (hooks git, lint, typecheck). Il est à proscrire
+quand un outil refuse un `node_modules` situé hors de la racine du projet :
+c'est le cas de Turbopack (bundler par défaut de Next.js à partir de la
+version 16), qui échoue au `dev` comme au `build` avec un lien symbolique ou
+une jonction qui sort du dossier. Un lien partagé désynchronise aussi les
+artefacts générés dans `node_modules` (client de base de données, types
+générés…) quand les deux checkouts sont sur des révisions différentes.
+
+TODO(acc-adapt) : préciser les dossiers de dépendances du projet, si un lien
+est acceptable ici (bundler, outils) et les artefacts générés qu'il
+désynchronise.
 
 ## Dépannage
 

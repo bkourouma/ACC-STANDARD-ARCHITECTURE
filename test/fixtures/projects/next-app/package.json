@@ -1,0 +1,20 @@
+{
+  "name": "next-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "predev": "node scripts/gen-data.mjs",
+    "dev": "next dev",
+    "prebuild": "node scripts/gen-data.mjs",
+    "build": "next build",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "next": "16.3.6",
+    "react": "19.2.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "typescript": "^5.0.0"
+  }
+}

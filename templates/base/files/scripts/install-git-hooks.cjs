@@ -1,8 +1,11 @@
 #!/usr/bin/env node
+/* eslint-disable -- script CommonJS géré par acc-standard : require() voulu, hors du lint du projet. */
 "use strict";
 
 // Installe les hooks git Lefthook (.lefthook.yml) dans le dépôt courant.
-// Lancé par le script `prepare` d'un projet Node, ou à la main :
+// Lancé par le script `prepare` d'un projet Node (qui ignore l'absence de ce
+// fichier, par exemple dans une image Docker qui ne copie que package*.json
+// avant l'installation), ou à la main :
 //   node scripts/install-git-hooks.cjs
 //
 // - Hors dépôt git : ne fait rien.
