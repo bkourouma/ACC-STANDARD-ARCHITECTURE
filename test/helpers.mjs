@@ -64,6 +64,47 @@ export function cli(args, { cwd = ROOT, env = {}, templates = TEMPLATES } = {}) 
   return { status: res.status, stdout: res.stdout, stderr: res.stderr };
 }
 
+/**
+ * bash utilisable pour lancer les hooks livrés. Sous Windows, `bash` seul peut
+ * désigner le lanceur WSL (System32) : on cherche Git Bash à côté de git.exe.
+ * ACC_TEST_BASH force un chemin. Renvoie null si rien n'est trouvé.
+ */
+function findBash() {
+  const works = (bin) => spawnSync(bin, ['-c', 'exit 0'], { windowsHide: true }).status === 0;
+  if (process.env.ACC_TEST_BASH) return works(process.env.ACC_TEST_BASH) ? process.env.ACC_TEST_BASH : null;
+  if (process.platform !== 'win32') return works('bash') ? 'bash' : null;
+  const where = spawnSync('where', ['git'], { encoding: 'utf8', windowsHide: true });
+  for (const gitExe of (where.stdout ?? '').split(/\r?\n/).filter(Boolean)) {
+    const root = path.dirname(path.dirname(gitExe));
+    for (const rel of [['usr', 'bin', 'bash.exe'], ['bin', 'bash.exe']]) {
+      const candidate = path.join(root, ...rel);
+      if (fs.existsSync(candidate) && works(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
+export const BASH = findBash();
+
+/**
+ * Lance un hook livré (bash) avec une entrée JSON. CLAUDE_PROJECT_DIR est
+ * toujours redéfini : sans cela, les tests lus dans une session Claude Code
+ * liraient l'acc.config.json du dépôt courant.
+ */
+export function runHook(hook, input, { cwd, project = cwd ?? tmpDir('acc-hook-vide-'), env = {} } = {}) {
+  const res = spawnSync(BASH, [hook.replace(/\\/g, '/')], {
+    cwd: cwd ?? project,
+    input: typeof input === 'string' ? input : JSON.stringify(input),
+    encoding: 'utf8',
+    windowsHide: true,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: project, ...env },
+  });
+  return { status: res.status, stdout: res.stdout, stderr: res.stderr };
+}
+
+/** Entrée d'un hook PreToolUse Bash. */
+export const bashInput = (command) => ({ tool_name: 'Bash', tool_input: { command } });
+
 /** Projet prêt : fixture copiée, config détectée écrite, dépôt git propre. */
 export function preparedProject(name = 'node-simple', mutate) {
   const dir = copyProject(name);

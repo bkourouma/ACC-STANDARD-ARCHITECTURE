@@ -5,6 +5,26 @@ ou supprime un fichier géré fournit `migrations/<version>.mjs`.
 
 ## Non publié
 
+- Correction (`apply --force`) : une sauvegarde existante n'est plus jamais
+  écrasée. La première reste `<fichier>.acc-bak`, les suivantes sont
+  `<fichier>.2.acc-bak`, `.3.acc-bak`… ; une sauvegarde identique au fichier
+  est réutilisée. `apply` liste les sauvegardes créées.
+- Correction (`update`) : `removeManaged` ne supprime plus un fichier modifié
+  localement, et `renameManaged` n'écrase plus une destination existante. Dans
+  les deux cas le fichier est conservé, quitte le manifeste et le journal en
+  donne la raison (`docs/CONTRACT.md` §7).
+- Sécurité (gabarit `base`) : `.claude/settings.json` refuse à l'agent
+  l'édition de `.claude/hooks/**` et demande confirmation avant toute édition
+  de `.claude/settings.json` et d'`acc.config.json` (qui porte `guard.*`).
+  AGENTS.md et CLAUDE.md disent que les hooks sont un filet contre les
+  accidents, pas une barrière. Les limites connues sont décrites dans
+  `docs/CONTRACT.md` §8.
+- Tests : les hooks `validate-bash.sh` et `pre-commit.sh` sont exécutés pour de
+  vrai (`test/hooks.test.mjs`, 7 limites connues en `todo`) et les gabarits
+  réels sont appliqués sur les projets factices, avec contrôle d'idempotence
+  (`test/templates-reelles.test.mjs`). Jusqu'ici, seuls des gabarits de
+  maquette étaient testés.
+
 - Correction (`detect`) : `git.mainBranch` ne se rabat plus sur la branche
   courante avant d'avoir cherché une branche locale `main` puis `master`, et
   `git.protectedBranches` n'inclut plus jamais cette branche courante par

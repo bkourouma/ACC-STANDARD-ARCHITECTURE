@@ -1,7 +1,8 @@
 // Application du plan : écriture des fichiers et du manifeste.
 // N'exécute jamais git add, commit ou push.
 import fs from 'node:fs';
-import { AccError, writeFileAtomic } from './fs-utils.mjs';
+import path from 'node:path';
+import { AccError, backupFile, toPosix, writeFileAtomic } from './fs-utils.mjs';
 import { isGitRepo, statusPorcelain, switchCreate } from './git.mjs';
 import { MANIFEST_FILE, writeManifest } from './manifest.mjs';
 import { computePlan, formatPlan } from './plan.mjs';
@@ -30,15 +31,16 @@ function createBranch(target) {
   return branch;
 }
 
-/** Exécute les écritures d'un élément du plan. */
+/** Exécute les écritures d'un élément du plan ; renvoie la sauvegarde créée, s'il y en a une. */
 function executeItem(item) {
-  if (item.backup) fs.copyFileSync(item.abs, `${item.abs}.acc-bak`);
+  const backup = item.backup ? backupFile(item.abs) : null;
   for (const write of item.writes) {
     writeFileAtomic(write.abs, write.content);
     if (item.executable && write.abs === item.abs && process.platform !== 'win32') {
       fs.chmodSync(write.abs, 0o755);
     }
   }
+  return backup;
 }
 
 /**
@@ -56,22 +58,27 @@ export function applyStandard(target, options) {
   let plan = computePlan(target, { templatesDir, force });
   const createdBranch = branch ? createBranch(target) : null;
   if (createdBranch) plan = computePlan(target, { templatesDir, force });
-  for (const item of plan.items) executeItem(item);
+  const backups = plan.items
+    .map(executeItem)
+    .filter(Boolean)
+    .map((file) => toPosix(path.relative(target, file)));
   const files = Object.fromEntries(plan.items.map((i) => [i.dest, i.entry]));
   const manifestWritten = writeManifest(target, files, plan.manifest);
   return {
     plan,
     branch: createdBranch,
     manifestWritten,
+    backups,
     exitCode: plan.conflicts ? 2 : 0,
-    output: formatApplyReport(plan, createdBranch, manifestWritten),
+    output: formatApplyReport(plan, createdBranch, manifestWritten, backups),
   };
 }
 
-function formatApplyReport(plan, branch, manifestWritten) {
+function formatApplyReport(plan, branch, manifestWritten, backups) {
   const lines = [];
   if (branch) lines.push(`Branche créée : ${branch}`, '');
   lines.push(formatPlan(plan), '');
+  if (backups.length) lines.push('Sauvegardes créées :', ...backups.map((b) => `  - ${b}`), '');
   lines.push(manifestWritten ? `Manifeste écrit : ${MANIFEST_FILE}` : 'Manifeste inchangé.');
   if (plan.conflicts) {
     lines.push(

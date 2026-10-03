@@ -36,7 +36,9 @@ Les règles de `.claude/rules/` se chargent seules selon les fichiers touchés
   destructrices (stash, remise à zéro, poussée forcée ou vers une branche
   protégée, `--no-verify`…) ; `pre-commit.sh` lance les contrôles de
   `hooks.preCommit` d'`acc.config.json` avant un `git commit`. Un refus de
-  hook se corrige, il ne se contourne pas.
+  hook se corrige, il ne se contourne pas. Ces hooks sont un filet contre les
+  accidents, pas une barrière : modifier `.claude/hooks/`, `.claude/settings.json`
+  ou `acc.config.json` pour assouplir une garde exige l'accord de l'utilisateur.
 - `CLAUDE.local.md` et `.claude/settings.local.json` : réglages propres à la
   machine, jamais commités.
 - Les fichiers posés par `acc-standard` en mode géré (`.acc/manifest.json`) se

@@ -97,6 +97,12 @@ confirmations imposées par la plateforme.
   motifs de `guard.destructiveCommands`) et `.claude/hooks/pre-commit.sh` lance
   les contrôles de `hooks.preCommit` avant un `git commit`. Un refus de hook se
   corrige, il ne se contourne pas.
+- Ces hooks sont un filet contre les accidents, pas une barrière : ils
+  analysent le texte de la commande et laissent passer ce qu'ils ne
+  reconnaissent pas (variable, `git -C`, script…). La protection de branche de
+  l'hébergeur reste indispensable. Ne jamais modifier `.claude/hooks/`,
+  `.claude/settings.json` ni `acc.config.json` pour assouplir une garde sans
+  l'accord explicite de l'utilisateur.
 - Les hooks git ne remplacent pas les vérifications pertinentes (typecheck,
   lint, tests ciblés) avant une livraison.
 - Repomix (facultatif) produit un contexte regroupé pour une revue ou un autre

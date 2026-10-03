@@ -159,6 +159,16 @@ SHA-256 hexadécimal du contenu normalisé.
 | `merge-json`  | créer (JSON du fragment) | fusion profonde, voir ci-dessous |
 | `merge-lines` | créer | ajouter les lignes absentes à la fin, sous un en-tête `# acc-standard` ajouté une seule fois |
 
+Sauvegardes `--force` (`managed` et `block`) : avant de remplacer `<dest>`, le
+moteur le copie en sauvegarde et **n'écrase jamais une sauvegarde existante**.
+La première s'appelle `<dest>.acc-bak` ; si elle existe déjà avec un contenu
+différent de `<dest>`, la suivante est `<dest>.2.acc-bak`, puis
+`<dest>.3.acc-bak`, etc. Si une sauvegarde existante a déjà exactement le
+contenu de `<dest>`, aucune nouvelle copie n'est faite (relancer la même
+commande ne multiplie pas les fichiers). Toutes les formes se terminent par
+`.acc-bak` : le motif `*.acc-bak` du `.gitignore` posé les couvre. `apply`
+liste dans son rapport chaque sauvegarde créée.
+
 Fusion `merge-lines` — ordre des négations : les lignes de négation du
 fragment (commençant par `!`, ex. `!.env.example`) doivent rester après le
 motif qu'elles réhabilitent, sans quoi elles perdent leur effet. Si au moins
@@ -277,9 +287,51 @@ ou variable ACC_TEMPLATES_DIR)
   supérieure à `config.standardVersion` et inférieure ou égale à la version du
   paquet (ordre semver), puis `apply`, puis met `standardVersion` à jour.
   Signature d'une migration :
-  `export default async function migrate({ target, config, log }) {}` ; elle
-  peut renommer ou supprimer des fichiers **gérés** et modifier `config`
-  (retourner la config modifiée).
+  `export default async function migrate({ target, config, log, renameManaged,
+  removeManaged }) {}` ; elle peut renommer ou supprimer des fichiers
+  **gérés** et modifier `config` (retourner la config modifiée). Les deux
+  aides ne détruisent jamais de travail local :
+  - `removeManaged(rel)` ne supprime le fichier que s'il est en mode `managed`
+    au manifeste **et** que son hash actuel est celui du manifeste. Sinon
+    (modifié localement, sans entrée de hash, `seed`, `block`…) le fichier est
+    conservé, son entrée quitte le manifeste (il devient propriété du projet)
+    et la raison est journalisée. Fichier déjà absent : l'entrée du manifeste
+    est simplement retirée.
+  - `renameManaged(from, to)` ne remplace jamais une destination existante :
+    si `to` existe, `from` reste en place, son entrée quitte le manifeste, un
+    message est journalisé, et le `apply` qui suit signale `to` comme conflit
+    s'il diffère du gabarit. Si `from` est modifié localement mais que `to`
+    est libre, le renommage a lieu et l'entrée du manifeste (ancien hash) est
+    reportée sur `to` : la modification locale ressortira en conflit au
+    `apply` suivant au lieu d'être écrasée.
 
 Codes de sortie : `0` succès, `1` erreur, `2` terminé avec conflits (ou
 `doctor` en échec).
+
+## 8. Garde-fous Claude Code livrés : portée et limites
+
+`.claude/settings.json` (fusionné) et les hooks `.claude/hooks/*.sh` (gérés)
+sont un **filet contre les accidents**, pas une barrière contre un agent qui
+contourne. Ce qu'ils garantissent et ce qu'ils ne garantissent pas :
+
+- `validate-bash.sh` est une liste noire d'expressions régulières appliquée au
+  texte de la commande. Il ne voit pas ce qui est construit dynamiquement
+  (variable, `git -C`, `git push origin HEAD` depuis une branche protégée,
+  `--mirror`, scripts, `node -e`…) ni ce qui est cité entre guillemets.
+  `docs/governance/SECURITY.md` et la protection de branche de l'hébergeur
+  restent la protection de dernier recours.
+- Les deux hooks **échouent ouverts** : outil absent, entrée illisible ou
+  exception → `exit 0`. Sous Windows sans bash, le hook n'est pas exécuté.
+- `settings.json` empêche l'agent de modifier ses propres garde-fous :
+  `permissions.deny` refuse Edit et Write sur `.claude/hooks/**`, et
+  `permissions.ask` impose une confirmation humaine pour Edit et Write sur
+  `.claude/settings.json` et `acc.config.json` (qui contient `guard.*`,
+  `git.protectedBranches` et `hooks.preCommit`). `ask` et non `deny` : la
+  compétence `/acc-adapt` doit pouvoir proposer des corrections à
+  `acc.config.json`. Ces règles ne couvrent pas une modification faite par
+  une commande shell (`sed -i`, redirection…).
+- Le moteur (`acc-standard apply`) n'est pas concerné par ces règles : il
+  tourne hors de Claude Code, sous la responsabilité de l'humain.
+- Le comportement des hooks est vérifié par `test/hooks.test.mjs`. Une limite
+  connue y est écrite comme test `todo` : elle se corrige en retirant le
+  `todo`, jamais en l'effaçant.

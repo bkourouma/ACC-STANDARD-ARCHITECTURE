@@ -63,7 +63,20 @@ détruit rien :
 - **merge-json** / **merge-lines** : fusion sans suppression (`settings.json`,
   `package.json`, `.mcp.json`, `.gitignore`).
 
+Avec `--force`, le fichier remplacé est d'abord sauvegardé en `.acc-bak`, puis
+`.2.acc-bak`, `.3.acc-bak`… : une sauvegarde n'est jamais écrasée.
+
 La spécification complète est dans [docs/CONTRACT.md](docs/CONTRACT.md).
+
+## Portée des garde-fous
+
+Les hooks Claude Code livrés (`validate-bash.sh`, `pre-commit.sh`) sont un
+filet contre les accidents, pas une barrière : `validate-bash.sh` est une liste
+noire d'expressions régulières qui ne voit ni une branche construite par
+variable, ni `git -C`, ni un script, et les deux hooks échouent ouverts. Gardez
+la protection de branche de votre hébergeur. Les limites connues sont listées
+dans [docs/CONTRACT.md](docs/CONTRACT.md) §8 et écrites en tests `todo`
+(`test/hooks.test.mjs`).
 
 ## Profils
 

@@ -101,7 +101,15 @@
       "Bash(rm -rf ~)",
       "Bash(rm -rf .git*)",
       "Bash(rm -rf node_modules)",
-      "Bash(rm -rf ./node_modules)"
+      "Bash(rm -rf ./node_modules)",
+      "Edit(**/.claude/hooks/**)",
+      "Write(**/.claude/hooks/**)"
+    ],
+    "ask": [
+      "Edit(**/.claude/settings.json)",
+      "Write(**/.claude/settings.json)",
+      "Edit(**/acc.config.json)",
+      "Write(**/acc.config.json)"
     ]
   }
 }
