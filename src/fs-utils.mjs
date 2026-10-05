@@ -65,22 +65,28 @@ export function writeFileAtomic(file, content) {
 }
 
 /**
- * Sauvegarde `file` sans jamais écraser une sauvegarde existante : `.acc-bak`,
- * puis `.2.acc-bak`, `.3.acc-bak`… Une sauvegarde déjà identique au fichier est
- * réutilisée. Renvoie le chemin de la sauvegarde.
+ * Suffixe de la sauvegarde de `file`, sans rien écrire : `.acc-bak`, puis
+ * `.2.acc-bak`, `.3.acc-bak`… Le premier nom libre, ou celui d'une sauvegarde
+ * déjà identique au fichier. Le plan s'en sert pour annoncer le nom réel.
  */
-export function backupFile(file) {
+export function backupSuffix(file) {
   const current = fs.readFileSync(file);
   for (let n = 1; ; n += 1) {
-    const candidate = n === 1 ? `${file}.acc-bak` : `${file}.${n}.acc-bak`;
-    try {
-      fs.copyFileSync(file, candidate, fs.constants.COPYFILE_EXCL);
-      return candidate;
-    } catch (error) {
-      if (error.code !== 'EEXIST') throw error;
-    }
-    if (fs.readFileSync(candidate).equals(current)) return candidate;
+    const suffix = n === 1 ? '.acc-bak' : `.${n}.acc-bak`;
+    const candidate = `${file}${suffix}`;
+    if (!fs.existsSync(candidate) || fs.readFileSync(candidate).equals(current)) return suffix;
   }
+}
+
+/**
+ * Sauvegarde `file` sans jamais écraser une sauvegarde existante (nom donné
+ * par backupSuffix). Une sauvegarde déjà identique au fichier est réutilisée.
+ * Renvoie le chemin de la sauvegarde.
+ */
+export function backupFile(file) {
+  const backup = `${file}${backupSuffix(file)}`;
+  if (!fs.existsSync(backup)) fs.copyFileSync(file, backup, fs.constants.COPYFILE_EXCL);
+  return backup;
 }
 
 /** Sérialise un JSON avec l'indentation voulue et une fin de ligne. */

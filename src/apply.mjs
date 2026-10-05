@@ -91,7 +91,7 @@ function formatApplyReport(plan, branch, manifestWritten, backups) {
   if (plan.adopted.length) {
     lines.push(
       '',
-      `${plan.adopted.length} fichier(s) adopté(s) : version du standard posée, version locale en .acc-bak.`,
+      `${plan.adopted.length} fichier(s) adopté(s) : version du standard posée, version locale sauvegardée (voir « Sauvegardes créées »).`,
       "Relisez git diff et reportez ce qui doit l'être (fichiers seed, hors blocs) ou proposez-le au standard.",
     );
   }

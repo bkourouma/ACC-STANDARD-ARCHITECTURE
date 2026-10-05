@@ -1,5 +1,5 @@
 // Mode managed : le fichier appartient au standard.
-import { finalize, sameContent, sha256 } from '../fs-utils.mjs';
+import { backupSuffix, finalize, sameContent, sha256 } from '../fs-utils.mjs';
 
 /**
  * @param item élément de buildFileList
@@ -21,7 +21,7 @@ export function planManaged(item, { current, entry, force, adopt }) {
   if (force || adopted) {
     return {
       action: '~',
-      detail: `${adopted ? 'adopté' : 'forcé'}, sauvegarde ${item.dest}.acc-bak`,
+      detail: `${adopted ? 'adopté' : 'forcé'}, sauvegarde ${item.dest}${backupSuffix(item.abs)}`,
       backup: true,
       adopted,
       writes: [{ abs: item.abs, content }],

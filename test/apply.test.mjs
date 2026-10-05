@@ -368,6 +368,7 @@ test('--force n\'écrase jamais une sauvegarde existante : .acc-bak, .2.acc-bak,
   const second = forceAvec(versions[1]);
   assert.equal(read(dir, `${rel}.acc-bak`), versions[0], 'la première sauvegarde est intacte');
   assert.equal(read(dir, `${rel}.2.acc-bak`), versions[1]);
+  assert.match(second.stdout, /forcé, sauvegarde \.claude\/hooks\/validate-bash\.sh\.2\.acc-bak/, 'le plan annonce le nom réel');
   assert.match(second.stdout, /- \.claude\/hooks\/validate-bash\.sh\.2\.acc-bak/);
 
   forceAvec(versions[2]);
@@ -376,7 +377,8 @@ test('--force n\'écrase jamais une sauvegarde existante : .acc-bak, .2.acc-bak,
   assert.equal(read(dir, `${rel}.3.acc-bak`), versions[2]);
 
   // Même contenu local qu'une sauvegarde existante : elle est réutilisée.
-  forceAvec(versions[1]);
+  const reuse = forceAvec(versions[1]);
+  assert.match(reuse.stdout, /forcé, sauvegarde \.claude\/hooks\/validate-bash\.sh\.2\.acc-bak/);
   assert.equal(exists(dir, `${rel}.4.acc-bak`), false, 'pas de doublon de sauvegarde');
 
   // Rien à forcer quand le fichier est conforme : aucune sauvegarde de plus.

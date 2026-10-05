@@ -8,7 +8,8 @@ ou supprime un fichier géré fournit `migrations/<version>.mjs`.
 - Correction (`apply --force`, `--adopt`) : une sauvegarde existante n'est
   plus jamais écrasée. La première reste `<fichier>.acc-bak`, les suivantes
   sont `<fichier>.2.acc-bak`, `.3.acc-bak`… ; une sauvegarde identique au
-  fichier est réutilisée. `apply` liste les sauvegardes créées.
+  fichier est réutilisée. Le plan annonce le nom réel de la sauvegarde et
+  `apply` liste les sauvegardes créées.
 - Correction (`update`) : `removeManaged` ne supprime plus un fichier modifié
   localement, et `renameManaged` n'écrase plus une destination existante. Dans
   les deux cas le fichier est conservé, quitte le manifeste et le journal en

@@ -117,6 +117,33 @@ test('--adopt : fichiers jamais repris remplacés avec sauvegarde, sans .acc-new
   assert.ok(manifest.files[HOOK].hash, 'fichier désormais repris par le standard');
 });
 
+test('--adopt : sauvegarde plus ancienne présente → .2.acc-bak annoncé et écrit, l\'ancienne intacte', () => {
+  const dir = copyProject('blank');
+  const localHook = '#!/usr/bin/env bash\necho "version locale"\n';
+  const localAgents = '# Équipe\n\n<!-- acc:begin agent-rules -->\nrègle locale\n<!-- acc:end agent-rules -->\n';
+  const anciennes = { [HOOK]: '#!/usr/bin/env bash\necho "ancienne"\n', 'AGENTS.md': '# Ancienne version\n' };
+  write(dir, HOOK, localHook);
+  write(dir, 'AGENTS.md', localAgents);
+  for (const [rel, content] of Object.entries(anciennes)) write(dir, `${rel}.acc-bak`, content);
+  cli(['detect', dir, '--write']);
+  gitInit(dir);
+
+  const preview = cli(['plan', dir, '--adopt']);
+  assert.match(preview.stdout, /adopté, sauvegarde \.claude\/hooks\/validate-bash\.sh\.2\.acc-bak/);
+  assert.match(preview.stdout, /adopté, sauvegarde AGENTS\.md\.2\.acc-bak/);
+  assert.equal(exists(dir, `${HOOK}.2.acc-bak`), false, 'plan n\'écrit aucune sauvegarde');
+
+  const res = cli(['apply', dir, '--adopt']);
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.match(res.stdout, /Sauvegardes créées :\s+- AGENTS\.md\.2\.acc-bak\s+- \.claude\/hooks\/validate-bash\.sh\.2\.acc-bak/);
+  assert.doesNotMatch(res.stdout, /sauvegarde (AGENTS\.md|\.claude\/hooks\/validate-bash\.sh)\.acc-bak/);
+  for (const [rel, content] of Object.entries(anciennes)) {
+    assert.equal(read(dir, `${rel}.acc-bak`), content, `${rel}.acc-bak intacte`);
+  }
+  assert.equal(read(dir, `${HOOK}.2.acc-bak`), localHook);
+  assert.equal(read(dir, 'AGENTS.md.2.acc-bak'), localAgents);
+});
+
 test('--adopt : un fichier déjà repris puis modifié reste un conflit', () => {
   const dir = preparedProject('blank');
   cli(['apply', dir]);

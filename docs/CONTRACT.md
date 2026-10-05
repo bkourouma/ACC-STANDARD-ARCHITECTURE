@@ -170,21 +170,23 @@ SHA-256 hexadécimal du contenu normalisé.
 
 | Mode          | Cible absente | Cible présente |
 | ------------- | ------------- | -------------- |
-| `managed`     | créer | si contenu = nouveau → rien ; sinon si `hash(actuel)` = hash du manifeste → remplacer ; sinon **conflit** : écrire `<dest>.acc-new`, ne pas toucher `<dest>` (avec `--force`, ou `--adopt` si le fichier n'a jamais été repris — voir ci-dessous : copier `<dest>` en `<dest>.acc-bak` puis remplacer) |
+| `managed`     | créer | si contenu = nouveau → rien ; sinon si `hash(actuel)` = hash du manifeste → remplacer ; sinon **conflit** : écrire `<dest>.acc-new`, ne pas toucher `<dest>` (avec `--force`, ou `--adopt` si le fichier n'a jamais été repris — voir ci-dessous : sauvegarder `<dest>` en `<dest>.acc-bak` ou `<dest>.N.acc-bak` puis remplacer) |
 | `block`       | créer (fichier rendu complet) | pour chaque bloc du gabarit : bloc présent dans la cible → remplacer son contenu si son hash actuel = hash du manifeste (ou s'il n'y a pas d'entrée et que le contenu est identique), sinon conflit de bloc ; bloc absent → l'ajouter en fin de fichier précédé d'une ligne vide. Les blocs de la cible absents du gabarit sont laissés tels quels. En cas de conflit : écrire `<dest>.acc-new` (fichier proposé complet) et ne rien modifier dans `<dest>` (même règle `--force` / `--adopt` que `managed`). Écrit en plus le squelette `.acc/skeletons/<dest>`, voir ci-dessous |
 | `seed`        | créer | ne jamais toucher |
 | `merge-json`  | créer (JSON du fragment) | fusion profonde, voir ci-dessous |
 | `merge-lines` | créer | ajouter les lignes absentes à la fin, sous un en-tête `# acc-standard` ajouté une seule fois |
 
-Sauvegardes `--force` (`managed` et `block`) : avant de remplacer `<dest>`, le
-moteur le copie en sauvegarde et **n'écrase jamais une sauvegarde existante**.
+Sauvegardes `--force` et `--adopt` (`managed` et `block`) : avant de
+remplacer `<dest>`, le moteur le copie en sauvegarde et **n'écrase jamais une
+sauvegarde existante**.
 La première s'appelle `<dest>.acc-bak` ; si elle existe déjà avec un contenu
 différent de `<dest>`, la suivante est `<dest>.2.acc-bak`, puis
 `<dest>.3.acc-bak`, etc. Si une sauvegarde existante a déjà exactement le
 contenu de `<dest>`, aucune nouvelle copie n'est faite (relancer la même
 commande ne multiplie pas les fichiers). Toutes les formes se terminent par
-`.acc-bak` : le motif `*.acc-bak` du `.gitignore` posé les couvre. `apply`
-liste dans son rapport chaque sauvegarde créée.
+`.acc-bak` : le motif `*.acc-bak` du `.gitignore` posé les couvre. Le plan
+annonce le nom réel de la sauvegarde (`forcé, sauvegarde <dest>.2.acc-bak`…)
+et `apply` liste dans son rapport chaque sauvegarde créée.
 
 Fusion `merge-lines` — ordre des négations : les lignes de négation du
 fragment (commençant par `!`, ex. `!.env.example`) doivent rester après le
@@ -225,10 +227,11 @@ les squelettes en attente.
 Adoption (`--adopt`) d'un projet déjà équipé : un fichier `managed` ou
 `block` en conflit **qui n'a jamais été repris par le standard** — pas
 d'entrée au manifeste, ou entrée sans `hash` (`managed`) ou sans hash pour
-chaque bloc en conflit (`block`) — est traité comme avec `--force` : copie en
-`<dest>.acc-bak`, puis version du standard posée. Un fichier déjà repris puis
-modifié localement reste un conflit (`.acc-new`) ; un `block` aux marqueurs
-invalides aussi. Le plan affiche `adopté, sauvegarde <dest>.acc-bak`.
+chaque bloc en conflit (`block`) — est traité comme avec `--force` :
+sauvegarde (même numérotation, voir « Sauvegardes » ci-dessus), puis version
+du standard posée. Un fichier déjà repris puis modifié localement reste un
+conflit (`.acc-new`) ; un `block` aux marqueurs invalides aussi. Le plan
+affiche `adopté, sauvegarde <dest>.acc-bak` (ou `<dest>.N.acc-bak`).
 L'utilisateur relit ensuite `git diff` (le dépôt était propre) et reporte ce
 qui doit l'être (fichiers `seed`, hors blocs) ou propose une évolution du
 standard.
@@ -367,7 +370,9 @@ ou variable ACC_TEMPLATES_DIR)
   - `renameManaged(from, to)` ne remplace jamais une destination existante :
     si `to` existe, `from` reste en place, son entrée quitte le manifeste, un
     message est journalisé, et le `apply` qui suit signale `to` comme conflit
-    s'il diffère du gabarit. Si `from` est modifié localement mais que `to`
+    s'il diffère du gabarit (avec `--force`, ou `--adopt` si `to` n'a pas de
+    hash au manifeste, `to` est sauvegardé puis remplacé, comme tout fichier
+    en conflit). Si `from` est modifié localement mais que `to`
     est libre, le renommage a lieu et l'entrée du manifeste (ancien hash) est
     reportée sur `to` : la modification locale ressortira en conflit au
     `apply` suivant au lieu d'être écrasée.
