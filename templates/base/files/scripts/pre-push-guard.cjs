@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable -- script CommonJS géré par acc-standard : require() voulu, hors du lint du projet. */
 "use strict";
 
 // Hook git pre-push (Lefthook, use_stdin) : refuse une poussée directe vers une

@@ -3,9 +3,9 @@ import { finalize, sameContent, sha256 } from '../fs-utils.mjs';
 
 /**
  * @param item élément de buildFileList
- * @param state { current: texte actuel ou null, entry: entrée du manifeste, force }
+ * @param state { current: texte actuel ou null, entry: entrée du manifeste, force, adopt }
  */
-export function planManaged(item, { current, entry, force }) {
+export function planManaged(item, { current, entry, force, adopt }) {
   const content = finalize(item.content);
   const fresh = { mode: 'managed', profile: item.profile, hash: sha256(content) };
   if (current === null) {
@@ -15,11 +15,15 @@ export function planManaged(item, { current, entry, force }) {
   if (entry?.hash && sha256(current) === entry.hash) {
     return { action: '~', writes: [{ abs: item.abs, content }], entry: fresh };
   }
-  if (force) {
+  // --adopt : seulement un fichier jamais repris par le standard (pas de hash
+  // au manifeste) ; une modification locale d'un fichier repris reste un conflit.
+  const adopted = Boolean(!force && adopt && !entry?.hash);
+  if (force || adopted) {
     return {
       action: '~',
-      detail: `forcé, sauvegarde ${item.dest}.acc-bak`,
+      detail: `${adopted ? 'adopté' : 'forcé'}, sauvegarde ${item.dest}.acc-bak`,
       backup: true,
+      adopted,
       writes: [{ abs: item.abs, content }],
       entry: fresh,
     };

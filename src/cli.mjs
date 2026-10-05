@@ -15,16 +15,18 @@ Usage (remplacer par « ${STANDARD_COMMAND} » si l'outil n'est pas installé) :
   acc-standard detect [cible] [--write] [--force]
       Analyse le projet et propose ${CONFIG_FILE}.
       --write  écrit la config si elle est absente ; --force la remplace.
-  acc-standard plan   [cible] [--json]
+  acc-standard plan   [cible] [--json] [--adopt]
       Affiche ce que apply ferait, sans rien écrire.
-  acc-standard apply  [cible] [--branch] [--allow-dirty] [--force] [--dry-run]
+  acc-standard apply  [cible] [--branch] [--allow-dirty] [--force] [--adopt] [--dry-run]
       Pose le standard. Exige un dépôt git propre (sauf --allow-dirty).
       --branch   crée chore/acc-standard-v${STANDARD_VERSION} avant d'écrire
       --force    remplace les fichiers modifiés localement (sauvegarde .acc-bak)
+      --adopt    projet déjà équipé : remplace (sauvegarde .acc-bak) les seuls
+                 fichiers jamais repris par le standard, au lieu de .acc-new
       --dry-run  équivaut à plan
   acc-standard doctor [cible] [--json]
       Vérifie l'installation (config, manifeste, dérive, conflits, hooks).
-  acc-standard update [cible] [--allow-dirty] [--force]
+  acc-standard update [cible] [--allow-dirty] [--force] [--adopt]
       Lance les migrations de version puis apply.
   acc-standard --help | --version
 
@@ -37,10 +39,10 @@ Aucune commande git add, commit ou push n'est jamais lancée.`;
 
 const COMMANDS = {
   detect: ['write', 'force'],
-  plan: ['json'],
-  apply: ['branch', 'allow-dirty', 'force', 'dry-run'],
+  plan: ['json', 'adopt'],
+  apply: ['branch', 'allow-dirty', 'force', 'adopt', 'dry-run'],
   doctor: ['json'],
-  update: ['allow-dirty', 'force'],
+  update: ['allow-dirty', 'force', 'adopt'],
 };
 const VALUE_OPTIONS = ['templates', 'migrations'];
 
@@ -127,7 +129,7 @@ async function dispatch(parsed, io, env, cwd) {
     case 'detect':
       return runDetect(target, flags, io);
     case 'plan': {
-      const plan = computePlan(target, { templatesDir: tdir });
+      const plan = computePlan(target, { templatesDir: tdir, adopt: flags.has('adopt') });
       io.out(flags.has('json') ? stringifyJson(planToJson(plan)).trimEnd() : formatPlan(plan));
       return plan.conflicts ? 2 : 0;
     }
@@ -136,6 +138,7 @@ async function dispatch(parsed, io, env, cwd) {
         templatesDir: tdir,
         allowDirty: flags.has('allow-dirty'),
         force: flags.has('force'),
+        adopt: flags.has('adopt'),
         branch: flags.has('branch'),
         dryRun: flags.has('dry-run'),
       });
@@ -153,6 +156,7 @@ async function dispatch(parsed, io, env, cwd) {
         migrationsDir: migrationsDir(parsed.values.migrations, env),
         allowDirty: flags.has('allow-dirty'),
         force: flags.has('force'),
+        adopt: flags.has('adopt'),
       });
       io.out(res.output);
       return res.exitCode;

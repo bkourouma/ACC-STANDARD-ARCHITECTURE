@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable -- script CommonJS géré par acc-standard : require() voulu, hors du lint du projet. */
 "use strict";
 
 // Bus de messages entre les processus « développement » et « démo/debug ».

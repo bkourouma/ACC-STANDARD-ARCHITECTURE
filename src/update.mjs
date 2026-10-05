@@ -81,7 +81,7 @@ export function migrationHelpers(target, manifest, log) {
  * @returns {{ exitCode, output }}
  */
 export async function updateStandard(target, options) {
-  const { templatesDir, migrationsDir, allowDirty = false, force = false } = options;
+  const { templatesDir, migrationsDir, allowDirty = false, force = false, adopt = false } = options;
   assertCleanRepo(target, allowDirty);
   const raw = readRawConfig(target);
   if (raw === null) throw new AccError('acc.config.json introuvable. Lancez d\'abord : acc-standard detect --write');
@@ -103,7 +103,7 @@ export async function updateStandard(target, options) {
     writeConfig(target, config);
     if (manifest) saveManifest(target, manifest);
   }
-  const applied = applyStandard(target, { templatesDir, allowDirty: true, force });
+  const applied = applyStandard(target, { templatesDir, allowDirty: true, force, adopt });
   if (migrations.length || config.standardVersion !== STANDARD_VERSION) {
     config.standardVersion = STANDARD_VERSION;
     writeConfig(target, config);

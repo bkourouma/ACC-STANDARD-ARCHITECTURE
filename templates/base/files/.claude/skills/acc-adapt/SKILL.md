@@ -36,6 +36,12 @@ sinon, traite tout.
    `grep -rn "TODO(acc-adapt)" --exclude-dir=node_modules --exclude-dir=.git .`
 3. Repère les fichiers `*.acc-new` en attente : ce sont des conflits que
    l'utilisateur doit arbitrer ; ne les fusionne pas toi-même, signale-les.
+4. Liste les squelettes `.acc/skeletons/**` : quand `AGENTS.md` ou
+   `CLAUDE.md` existaient avant le standard, seuls les blocs gérés y ont été
+   ajoutés ; le squelette est le fichier complet que le standard aurait posé
+   (tables, « Structure réelle », « Commandes », `TODO(acc-adapt)`…).
+5. Repère les sauvegardes `*.acc-bak` laissées par `apply --adopt` : la
+   version locale d'un fichier géré remplacée par celle du standard.
 
 ## 2. Explorer le code réel
 
@@ -89,6 +95,18 @@ Fichiers concernés (hors blocs gérés) :
 Un TODO que tu ne peux pas résoudre faute d'information reste en place avec
 une note précise de ce qui manque.
 
+Pour chaque squelette `.acc/skeletons/<fichier>` : compare-le, section par
+section (titres `##`), au `<fichier>` réel. Chaque section du squelette
+absente du fichier réel (hors blocs gérés) y est ajoutée, remplie à partir
+du code comme ci-dessus ou laissée en `TODO(acc-adapt)` ; une section déjà
+couverte sous un autre titre n'est pas dupliquée. Garde l'ordre et le ton du
+fichier existant, ne touche à aucun bloc géré. Le squelette une fois
+intégré, supprime-le (il n'est pas recréé). Pour une sauvegarde
+`<fichier>.acc-bak` d'un fichier adopté : reporte dans les fichiers seed ou
+hors blocs ce qu'elle contenait de propre au projet, note dans ton rapport ce
+qui relèverait d'une évolution du standard, puis laisse l'utilisateur la
+supprimer.
+
 ## 5. Créer les règles par chemin utiles
 
 Crée dans `.claude/rules/` une règle par domaine où le projet a des
@@ -105,7 +123,8 @@ Ne crée pas de règle sans contenu vérifié.
 
 ## 6. Vérifier
 
-1. `grep -rn "TODO(acc-adapt)"` : liste ce qui reste et pourquoi.
+1. `grep -rn "TODO(acc-adapt)" --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=.acc .` :
+   liste ce qui reste et pourquoi (`.acc/skeletons/` doit être vide).
 2. `npx github:bkourouma/ACC-STANDARD-ARCHITECTURE doctor` : corrige ce qui relève de l'adaptation
    (config, fichiers attendus) ; signale le reste (hooks git non installés,
    conflits `.acc-new`, dérive d'un fichier géré).

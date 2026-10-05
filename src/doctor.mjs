@@ -5,7 +5,7 @@ import { CONFIG_FILE, readRawConfig, validateConfig, withDefaults } from './conf
 import { readTextIfExists, sha256, toLf } from './fs-utils.mjs';
 import { gitDir, isGitRepo } from './git.mjs';
 import { MANIFEST_FILE, readManifest } from './manifest.mjs';
-import { parseBlocks } from './modes/block.mjs';
+import { parseBlocks, SKELETONS_DIR } from './modes/block.mjs';
 import { compareSemver, STANDARD_VERSION } from './version.mjs';
 
 const SKIP_DIRS = new Set(['.git', 'node_modules']);
@@ -84,6 +84,52 @@ function checkManifest(target, report) {
   return undefined;
 }
 
+/** Tous les fichiers sous un dossier relatif (notation POSIX), triés. */
+function listFiles(root, rel) {
+  let entries = [];
+  try {
+    entries = fs.readdirSync(path.join(root, rel), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .flatMap((e) => (e.isDirectory() ? listFiles(root, `${rel}/${e.name}`) : e.isFile() ? [`${rel}/${e.name}`] : []))
+    .sort();
+}
+
+function checkSkeletons(target, report) {
+  const pending = listFiles(target, SKELETONS_DIR);
+  if (pending.length) {
+    return report('warn', 'Squelettes en attente', `${pending.join(', ')} : à intégrer par /acc-adapt, puis à supprimer`);
+  }
+  return report('ok', 'Squelettes en attente', 'aucun');
+}
+
+// Forme posée par les versions précédentes du fragment `node` : échoue quand
+// scripts/ n'est pas encore copié (image Docker qui ne copie que package*.json).
+const FRAGILE_PREPARE = /(?:^|&&|;|\|\|)\s*node\s+(?:\.\/)?scripts\/install-git-hooks\.cjs\b/;
+export const TOLERANT_PREPARE =
+  "node -e \"require('fs').existsSync('scripts/install-git-hooks.cjs')&&require('./scripts/install-git-hooks.cjs')\"";
+
+function checkPrepare(target, report) {
+  const text = readTextIfExists(path.join(target, 'package.json'));
+  if (text === null) return undefined;
+  let prepare;
+  try {
+    prepare = JSON.parse(toLf(text)).scripts?.prepare;
+  } catch {
+    return undefined;
+  }
+  if (typeof prepare === 'string' && FRAGILE_PREPARE.test(prepare)) {
+    return report(
+      'warn',
+      'Script prepare',
+      `échoue si scripts/install-git-hooks.cjs est absent (Dockerfile) ; forme tolérante : ${TOLERANT_PREPARE}`,
+    );
+  }
+  return undefined;
+}
+
 function checkGitHooks(target, report) {
   if (!isGitRepo(target)) return report('warn', 'Hooks git', 'pas de dépôt git');
   const dir = gitDir(target);
@@ -121,6 +167,8 @@ export function runDoctor(target) {
   const pending = findPendingNew(target);
   if (pending.length) report('fail', 'Conflits en attente', pending.join(', '));
   else report('ok', 'Conflits en attente', 'aucun fichier .acc-new');
+  checkSkeletons(target, report);
+  checkPrepare(target, report);
   checkGitHooks(target, report);
   checkClaudeHooks(target, report);
   const ok = !checks.some((c) => c.status === 'fail');
