@@ -48,6 +48,23 @@ const REFUSEES = [
   ['rm -fr .git', /dossier protégé/],
   ['Remove-Item -Recurse -Force node_modules', /Remove-Item -Recurse/],
   ['bash -c "git stash"', /git stash/],
+  // Anciennes limites connues, corrigées : options globales de git, cible citée,
+  // --mirror, suppression ou renommage d'une branche protégée.
+  ['git -C . push origin main', /branche protégée/],
+  ['git -C "mon dossier" push origin main', /branche protégée/],
+  ['git --no-pager -c user.name=x push origin master', /branche protégée/],
+  ['sh -c "git push origin main"', /branche protégée/],
+  ['git push origin "main"', /branche protégée/],
+  ["git push origin 'main'", /branche protégée/],
+  ['git push --mirror', /--mirror/],
+  ['git -C . push --mirror origin', /--mirror/],
+  ['git branch -D main', /branche protégée/],
+  ['git branch -d master', /branche protégée/],
+  ['git branch -m main ancienne', /branche protégée/],
+  ['git -C . stash', /git stash/],
+  ['git -C . reset --hard', /reset --hard/],
+  ['git -C . commit --no-verify -m x', /--no-verify/],
+  ['git -C . clean -fd', /git clean -f/],
 ];
 
 const AUTORISEES = [
@@ -65,6 +82,14 @@ const AUTORISEES = [
   'grep -n "git reset --hard" docs/notes.md',
   "cat > notes.md <<'EOF'\ngit push origin main\ngit stash\nEOF",
   'npm test',
+  'git -C . status',
+  'git -C sous-dossier push origin feat/x',
+  'git --no-pager log -3',
+  'git branch -d feat/x',
+  'git branch -D feat/main',
+  'git branch --list main',
+  'git push origin "feat/x"',
+  'echo "git push --mirror"',
 ];
 
 test('validate-bash : commandes destructrices refusées (code 2, raison en français)', { skip: SKIP }, () => {
@@ -128,11 +153,6 @@ test('validate-bash : configuration absente ou illisible → valeurs par défaut
 // comportement ATTENDU, en `todo` : le test échoue sans faire échouer la suite
 // tant que la limite existe. Pour en corriger une, retirer son `todo`.
 const LIMITES = [
-  ['git -C . push origin main', 'git -C <dossier> contourne la détection de « git push »'],
-  ['sh -c "git push origin main"', 'le guillemet fermant colle à « main » : la branche n\'est pas reconnue'],
-  ['git push --mirror', 'push --mirror écrase toutes les références distantes'],
-  ['git branch -D main', 'suppression d\'une branche protégée'],
-  ['git push origin "main"', 'texte cité neutralisé (limite acceptée dans le hook)'],
   ['B=main; git push origin $B', 'valeur construite dynamiquement : non corrigeable par regex'],
   ['node -e "require(\'child_process\').execSync(\'git push -f origin main\')"', 'commande lancée depuis un script : non corrigeable par regex'],
 ];

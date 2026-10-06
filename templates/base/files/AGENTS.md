@@ -99,7 +99,7 @@ confirmations imposées par la plateforme.
   corrige, il ne se contourne pas.
 - Ces hooks sont un filet contre les accidents, pas une barrière : ils
   analysent le texte de la commande et laissent passer ce qu'ils ne
-  reconnaissent pas (variable, `git -C`, script…). La protection de branche de
+  reconnaissent pas (variable, script, `node -e`…). La protection de branche de
   l'hébergeur reste indispensable. Ne jamais modifier `.claude/hooks/`,
   `.claude/settings.json` ni `acc.config.json` pour assouplir une garde sans
   l'accord explicite de l'utilisateur.

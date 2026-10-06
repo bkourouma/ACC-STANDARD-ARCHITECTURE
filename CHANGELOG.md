@@ -5,6 +5,14 @@ ou supprime un fichier géré fournit `migrations/<version>.mjs`.
 
 ## Non publié
 
+- Sécurité (`validate-bash.sh`) : cinq limites connues sont corrigées. Les
+  options globales de git sont reconnues (`git -C . push origin main`,
+  `git -C . reset --hard`…), une cible citée est refusée
+  (`git push origin "main"`, `sh -c "git push origin main"`), `git push
+  --mirror` est refusé, et `git branch -D|-d|-m` d'une branche protégée aussi.
+  Restent en `todo` : valeur construite dynamiquement (`B=main; git push
+  origin $B`) et commande lancée depuis un script (`node -e`).
+
 - Correction (`apply --force`, `--adopt`) : une sauvegarde existante n'est
   plus jamais écrasée. La première reste `<fichier>.acc-bak`, les suivantes
   sont `<fichier>.2.acc-bak`, `.3.acc-bak`… ; une sauvegarde identique au
