@@ -36,9 +36,11 @@ npm run check:generic   # gabarits sans référence propre à un projet
   terme métier en dur : ils viennent de `acc.config.json` (rendu ou lecture à
   l'exécution). `npm run check:generic` doit passer.
 - **Ne jamais détruire.** Un fichier modifié localement dans un projet cible
-  n'est jamais écrasé sans `--force` (et alors sauvegardé en `.acc-bak`). Le
-  moteur ne lance jamais `git add`, `commit` ni `push` dans un projet cible et
-  refuse toute destination `.env`.
+  n'est jamais écrasé sans `--force`, ou `--adopt` pour un fichier jamais
+  repris par le standard ; il est alors sauvegardé en `.acc-bak` (numéroté
+  `.N.acc-bak`, une sauvegarde n'est jamais écrasée). Le moteur ne lance
+  jamais `git add`, `commit` ni `push` dans un projet cible et refuse toute
+  destination `.env`.
 - **Idempotence.** `apply` lancé deux fois ne change aucun octet la deuxième
   fois ; un test le vérifie pour chaque projet factice.
 - **Versions.** Un renommage ou une suppression de fichier géré exige une

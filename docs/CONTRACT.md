@@ -149,6 +149,9 @@ profils visent la même `dest`, c'est une erreur de gabarit sauf en mode
 | ---------------- | ---------------------------------------------------------- |
 | `base`           | AGENTS.md, CLAUDE.md, docs/workflows, .claude (agents, hooks, rules, skills, settings), scripts git et bus, .lefthook.yml, .gitignore, .editorconfig, .gitattributes |
 | `node`           | fragments package.json (scripts, devDependencies, lint-staged), repomix, .mcp.json, CI GitHub Actions |
+| `adapter-codex`  | .codex/config.toml, .codex/agents/*.toml                   |
+| `adapter-cursor` | .cursor/rules/acc-standard.mdc                             |
+| `demo-instance`  | scripts/demo-instance.cjs piloté par `config.demo`         |
 
 Script `prepare` du fragment `node` : il ne lance
 `scripts/install-git-hooks.cjs` que si le fichier existe
@@ -159,9 +162,6 @@ copie que `package*.json` avant `npm install`). Une commande vide dans
 gabarits qui l'utilisent : la CI rend une étape d'avertissement visible au
 lieu d'omettre silencieusement les tests, et `/audit` le signale comme
 vérification non faite.
-| `adapter-codex`  | .codex/config.toml, .codex/agents/*.toml                   |
-| `adapter-cursor` | .cursor/rules/acc-standard.mdc                             |
-| `demo-instance`  | scripts/demo-instance.cjs piloté par `config.demo`         |
 
 ## 5. Modes de propriété
 
