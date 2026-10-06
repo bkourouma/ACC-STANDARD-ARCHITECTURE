@@ -63,7 +63,7 @@ export function applyStandard(target, options) {
     .filter(Boolean)
     .map((file) => toPosix(path.relative(target, file)));
   const files = Object.fromEntries(plan.items.map((i) => [i.dest, i.entry]));
-  const manifestWritten = writeManifest(target, files, plan.manifest);
+  const manifestWritten = writeManifest(target, files, plan.manifest, plan.retired);
   return {
     plan,
     branch: createdBranch,

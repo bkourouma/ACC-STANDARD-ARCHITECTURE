@@ -1,7 +1,7 @@
 // Calcul et affichage du plan : ce que apply ferait, fichier par fichier.
 import { loadConfig } from './config.mjs';
 import { readTextIfExists } from './fs-utils.mjs';
-import { readManifest } from './manifest.mjs';
+import { manifestEntry, readManifest, retiredEntries } from './manifest.mjs';
 import { planBlock } from './modes/block.mjs';
 import { planManaged } from './modes/managed.mjs';
 import { planMergeJson } from './modes/merge-json.mjs';
@@ -34,7 +34,8 @@ export function renderContext(config) {
 
 /**
  * Calcule le plan complet.
- * @returns {{ target, config, profiles, items, totals, conflicts, skeletons, adopted, nextSteps, manifest }}
+ * `retired` : section du même nom du manifeste à écrire (contrat §6).
+ * @returns {{ target, config, profiles, items, totals, conflicts, skeletons, adopted, nextSteps, manifest, retired }}
  */
 export function computePlan(target, { templatesDir, force = false, adopt = false, config: given } = {}) {
   const config = given ?? loadConfig(target);
@@ -43,7 +44,8 @@ export function computePlan(target, { templatesDir, force = false, adopt = false
   const files = buildFileList(profiles, renderContext(config), target);
   const items = files.map((item) => {
     const current = readTextIfExists(item.abs);
-    const entry = manifest?.files?.[item.dest];
+    // Un fichier de nouveau livré retrouve sa trace dans retired : déjà repris.
+    const entry = manifestEntry(manifest, item.dest);
     const result = PLANNERS[item.mode](item, { current, entry, force, adopt, target });
     return { ...item, ...result };
   });
@@ -60,6 +62,7 @@ export function computePlan(target, { templatesDir, force = false, adopt = false
     adopted: items.filter((i) => i.adopted).map((i) => i.dest),
     nextSteps: collectNextSteps(profiles),
     manifest,
+    retired: retiredEntries(target, manifest, new Set(items.map((i) => i.dest))),
   };
 }
 

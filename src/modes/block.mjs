@@ -119,7 +119,7 @@ function planExisting(item, template, { current, entry, force, adopt }) {
   const append = [];
   const conflicts = [...target.errors];
   // Un conflit « connu » touche un bloc déjà repris par le standard (hash au
-  // manifeste) : --adopt ne le résout pas.
+  // manifeste, dans files ou retired) : --adopt ne le résout pas.
   let knownConflict = target.errors.length > 0;
   for (const id of template.order) {
     const wanted = template.blocks.get(id).content;

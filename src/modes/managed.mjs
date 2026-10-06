@@ -16,7 +16,8 @@ export function planManaged(item, { current, entry, force, adopt }) {
     return { action: '~', writes: [{ abs: item.abs, content }], entry: fresh };
   }
   // --adopt : seulement un fichier jamais repris par le standard (pas de hash
-  // au manifeste) ; une modification locale d'un fichier repris reste un conflit.
+  // au manifeste, ni dans files ni dans retired) ; une modification locale
+  // d'un fichier repris reste un conflit.
   const adopted = Boolean(!force && adopt && !entry?.hash);
   if (force || adopted) {
     return {
