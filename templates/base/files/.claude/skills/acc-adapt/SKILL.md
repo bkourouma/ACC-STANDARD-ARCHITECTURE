@@ -17,11 +17,12 @@ sinon, traite tout.
 
 ## 0. Ce que tu ne touches jamais
 
-- Un fichier en mode `managed` du manifeste `.acc/manifest.json` (agents,
-  hooks, contrats de processus, scripts, cette compétence…) : il appartient au
-  standard, une modification locale serait signalée comme dérive et bloquerait
-  les mises à jour. Si un contenu géré ne convient pas au projet, note-le dans
-  ton rapport comme proposition d'évolution du standard.
+- Un fichier en mode `managed` de la section `files` du manifeste
+  `.acc/manifest.json` (agents, hooks, contrats de processus, scripts, cette
+  compétence…) : il appartient au standard, une modification locale serait
+  signalée comme dérive et bloquerait les mises à jour. Si un contenu géré ne
+  convient pas au projet, note-le dans ton rapport comme proposition
+  d'évolution du standard.
 - Le contenu entre `<!-- acc:begin <id> -->` et `<!-- acc:end <id> -->`
   (blocs gérés d'`AGENTS.md`, `CLAUDE.md`). Tu écris uniquement hors blocs.
 - Les fichiers `.env` (hors `.env.example`) : ni lecture ni écriture.
@@ -42,6 +43,12 @@ sinon, traite tout.
    (tables, « Structure réelle », « Commandes », `TODO(acc-adapt)`…).
 5. Repère les sauvegardes `*.acc-bak` laissées par `apply --adopt` : la
    version locale d'un fichier géré remplacée par celle du standard.
+6. Repère la section `retired` du manifeste : fichiers repris par le standard
+   qui ne sont plus livrés (option `when`, profil ou adaptateur désactivé)
+   mais existent encore. Ils appartiennent au projet et ne sont plus mis à
+   jour ; signale-les dans ton rapport (les supprimer s'ils ne servent plus
+   est une décision de l'utilisateur). Si l'option est réactivée, une
+   modification locale ressortira en conflit `.acc-new`, jamais adoptée.
 
 ## 2. Explorer le code réel
 

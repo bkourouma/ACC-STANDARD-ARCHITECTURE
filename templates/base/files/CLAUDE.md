@@ -41,9 +41,12 @@ Les règles de `.claude/rules/` se chargent seules selon les fichiers touchés
   ou `acc.config.json` pour assouplir une garde exige l'accord de l'utilisateur.
 - `CLAUDE.local.md` et `.claude/settings.local.json` : réglages propres à la
   machine, jamais commités.
-- Les fichiers posés par `acc-standard` en mode géré (`.acc/manifest.json`) se
-  modifient dans le standard, pas localement : une modification locale est
-  signalée par `npx github:bkourouma/ACC-STANDARD-ARCHITECTURE doctor`.
+- Les fichiers posés par `acc-standard` en mode géré (section `files` de
+  `.acc/manifest.json`) se modifient dans le standard, pas localement : une
+  modification locale est signalée par `npx github:bkourouma/ACC-STANDARD-ARCHITECTURE doctor`.
+  Ceux de la section `retired` ne sont plus livrés (option, profil ou
+  adaptateur désactivé) : ils appartiennent au projet, mais s'ils sont de
+  nouveau livrés, une modification locale ressortira en conflit (`.acc-new`).
 <!-- acc:end claude-tooling -->
 
 <!-- acc:begin claude-subagents -->

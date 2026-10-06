@@ -107,3 +107,31 @@ test('gabarits réels : AGENTS.md et CLAUDE.md disent que les hooks sont un file
     assert.match(read(dir, rel), /filet\s+contre\s+les\s+accidents,\s+pas\s+une\s+barrière/, rel);
   }
 });
+
+test('gabarits réels : CLAUDE.md, HANDOFF.md et /acc-adapt expliquent la section retired du manifeste', () => {
+  const dir = preparedProject('blank');
+  assert.equal(real(['apply', dir]).status, 0);
+  for (const rel of ['CLAUDE.md', 'docs/workflows/HANDOFF.md', '.claude/skills/acc-adapt/SKILL.md']) {
+    const text = read(dir, rel);
+    assert.match(text, /section\s+`retired`/, rel);
+    assert.match(text, /modification\s+locale\s+ressort(ira)?\s+en\s+conflit/, rel);
+  }
+});
+
+test('gabarits réels : bus désactivé → agent-bus.cjs conservé dans retired, doctor sain', () => {
+  const dir = preparedProject('blank');
+  assert.equal(real(['apply', dir]).status, 0);
+  commitAll(dir, 'standard');
+  const config = JSON.parse(read(dir, 'acc.config.json'));
+  config.options.agentBus = false;
+  write(dir, 'acc.config.json', `${JSON.stringify(config, null, 2)}\n`);
+  commitAll(dir, 'bus désactivé');
+  const res = real(['apply', dir]);
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.ok(exists(dir, 'scripts/agent-bus.cjs'), 'apply ne supprime pas un fichier plus livré');
+  const manifest = JSON.parse(read(dir, '.acc/manifest.json'));
+  assert.equal(manifest.files['scripts/agent-bus.cjs'], undefined);
+  assert.deepEqual(Object.keys(manifest.retired), ['scripts/agent-bus.cjs']);
+  const doctor = real(['doctor', dir]);
+  assert.equal(doctor.status, 0, doctor.stdout);
+});

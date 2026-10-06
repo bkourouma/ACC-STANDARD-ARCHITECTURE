@@ -35,6 +35,15 @@ ou supprime un fichier géré fournit `migrations/<version>.mjs`.
   squelette. La trace est oubliée quand le fichier est supprimé ; la section
   est absente quand elle est vide, et un ancien manifeste reste valide
   (`docs/CONTRACT.md` §5, §6 et §7).
+- Gabarits (`CLAUDE.md`, `HANDOFF.md`, compétence `/acc-adapt`) : ils
+  expliquent la section `retired` du manifeste. Ses fichiers ne sont plus
+  livrés et appartiennent au projet, mais une modification locale ressort en
+  conflit s'ils sont de nouveau livrés. `/acc-adapt` ne tient pour
+  intouchables que les fichiers `managed` de la section `files` et signale
+  ceux de `retired` dans son rapport. Les projets reçoivent la mise à jour du
+  bloc `claude-tooling` de `CLAUDE.md` et de la compétence au prochain
+  `apply` ; `HANDOFF.md` (seed) n'est pas modifié dans un projet déjà
+  équipé.
 - Sécurité (gabarit `base`) : `.claude/settings.json` refuse à l'agent
   l'édition de `.claude/hooks/**` et demande confirmation avant toute édition
   de `.claude/settings.json` et d'`acc.config.json` (qui porte `guard.*`).

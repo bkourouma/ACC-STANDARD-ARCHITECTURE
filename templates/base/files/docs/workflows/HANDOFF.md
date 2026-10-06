@@ -61,4 +61,6 @@ Pièges et décisions :
 
 - Les fichiers gérés (voir `.acc/manifest.json`) ne se modifient pas
   localement : `npx github:bkourouma/ACC-STANDARD-ARCHITECTURE update` les remplacerait ou signalerait un
-  conflit.
+  conflit. Ceux de la section `retired` ne sont plus livrés et appartiennent
+  au projet ; s'ils sont de nouveau livrés, une modification locale ressort
+  en conflit (`.acc-new`).
