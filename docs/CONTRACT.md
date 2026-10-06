@@ -230,7 +230,10 @@ d'entrée au manifeste, ou entrée sans `hash` (`managed`) ou sans hash pour
 chaque bloc en conflit (`block`) — est traité comme avec `--force` :
 sauvegarde (même numérotation, voir « Sauvegardes » ci-dessus), puis version
 du standard posée. Un fichier déjà repris puis modifié localement reste un
-conflit (`.acc-new`) ; un `block` aux marqueurs invalides aussi. Le plan
+conflit (`.acc-new`) ; un `block` aux marqueurs invalides aussi. C'est encore
+le cas quand le fichier n'a plus été livré pendant un temps (condition `when`
+devenue fausse, profil ou adaptateur retiré) puis l'est de nouveau : son
+entrée est restée dans la section `retired` du manifeste (§6). Le plan
 affiche `adopté, sauvegarde <dest>.acc-bak` (ou `<dest>.N.acc-bak`).
 L'utilisateur relit ensuite `git diff` (le dépôt était propre) et reporte ce
 qui doit l'être (fichiers `seed`, hors blocs) ou propose une évolution du
@@ -264,12 +267,37 @@ Interdit absolu : aucune `dest` ne peut correspondre à `.env` ou `.env.*`
     "AGENTS.md": { "mode": "block", "profile": "base", "blocks": { "agent-workflows": "…" } },
     "docs/workflows/HANDOFF.md": { "mode": "seed", "profile": "base" },
     ".claude/settings.json": { "mode": "merge-json", "profile": "base" }
+  },
+  "retired": {
+    "scripts/agent-bus.cjs": { "mode": "managed", "profile": "base", "hash": "…" }
   }
 }
 ```
 
-En cas de conflit, l'entrée du manifeste garde l'ancien hash (le fichier n'a
-pas été repris par le standard).
+- `files` : une entrée par destination livrée par le dernier `apply`.
+- En cas de conflit, l'entrée du manifeste garde l'ancien hash (le fichier n'a
+  pas été repris par le standard).
+- `retired` (absente quand elle est vide) : entrées `managed` et `block` des
+  fichiers qu'un `apply` précédent avait inscrits mais qui ne sont plus livrés
+  (condition `when` devenue fausse, comme `options.agentBus` ; profil,
+  adaptateur ou `options.demoInstance` retiré) et qui **existent encore** sur
+  le disque. L'entrée y passe telle quelle, avec son hash, triée par
+  destination. Sans elle, l'absence de hash ferait passer un fichier repris
+  puis modifié localement pour « jamais repris », et `--adopt` le
+  remplacerait à son retour (§5).
+  - À chaque `apply`, une entrée de `files` ou de `retired` dont la
+    destination n'est pas livrée est gardée dans `retired` tant que le fichier
+    existe, et oubliée sinon. Les entrées `seed`, `merge-json` et
+    `merge-lines` ne portent aucun état utile et ne sont pas gardées.
+  - Quand la destination est de nouveau livrée, son entrée est lue dans
+    `files`, à défaut dans `retired` : fichier resté tel que posé → mis à jour
+    (`~`) ; modifié localement → conflit (`!`), y compris avec `--adopt` ;
+    pour un `block`, pas de nouveau squelette. Elle repasse ensuite dans
+    `files`.
+  - `apply` n'écrit ni ne supprime jamais un fichier de `retired` ; `doctor`
+    ne l'examine pas (ni présence, ni dérive) : tant qu'il n'est pas livré, le
+    fichier est la propriété du projet.
+  - Un ancien manifeste sans `retired` reste valide.
 
 ## 7. Commandes
 
@@ -344,8 +372,9 @@ ou variable ACC_TEMPLATES_DIR)
   Ne lance jamais `git add`, `commit`, `push`. Écrit le manifeste, puis
   affiche les squelettes écrits, les fichiers adoptés, les `nextSteps` des
   profils et la commande de commit suggérée.
-- `doctor` : config valide, manifeste présent, fichiers du manifeste présents,
-  dérive des `managed` (modifiés localement), `.acc-new` en attente, hooks git
+- `doctor` : config valide, manifeste présent, fichiers du manifeste présents
+  et dérive des `managed` (modifiés localement), pour la seule section `files`
+  (§6), `.acc-new` en attente, hooks git
   installés (`.git/hooks/pre-commit` et `pre-push` mentionnent lefthook), hooks
   Claude déclarés dans `.claude/settings.json`, version du standard. En
   avertissement (sans échec) : squelettes `.acc/skeletons/` en attente, et
@@ -360,22 +389,29 @@ ou variable ACC_TEMPLATES_DIR)
   `export default async function migrate({ target, config, log, renameManaged,
   removeManaged }) {}` ; elle peut renommer ou supprimer des fichiers
   **gérés** et modifier `config` (retourner la config modifiée). Les deux
-  aides ne détruisent jamais de travail local :
+  aides ne détruisent jamais de travail local. Elles lisent l'entrée d'un
+  fichier dans `files`, à défaut dans `retired` (§6), et un fichier qu'elles
+  conservent hors livraison garde sa trace comme après un `apply` : son
+  entrée `managed` ou `block` passe dans `retired` (les autres modes sont
+  oubliés). Il devient propriété du projet ; si une version ultérieure livre
+  de nouveau ce chemin, une modification locale ressort en conflit au lieu
+  d'être adoptée.
   - `removeManaged(rel)` ne supprime le fichier que s'il est en mode `managed`
-    au manifeste **et** que son hash actuel est celui du manifeste. Sinon
-    (modifié localement, sans entrée de hash, `seed`, `block`…) le fichier est
-    conservé, son entrée quitte le manifeste (il devient propriété du projet)
-    et la raison est journalisée. Fichier déjà absent : l'entrée du manifeste
-    est simplement retirée.
+    au manifeste **et** que son hash actuel est celui du manifeste ; l'entrée
+    est alors oubliée. Sinon (modifié localement, sans entrée de hash, `seed`,
+    `block`…) le fichier est conservé, son entrée quitte `files` pour
+    `retired` (voir ci-dessus) et la raison est journalisée. Fichier déjà
+    absent : l'entrée du manifeste est simplement oubliée.
   - `renameManaged(from, to)` ne remplace jamais une destination existante :
-    si `to` existe, `from` reste en place, son entrée quitte le manifeste, un
+    si `to` existe, `from` reste en place, son entrée passe dans `retired`, un
     message est journalisé, et le `apply` qui suit signale `to` comme conflit
     s'il diffère du gabarit (avec `--force`, ou `--adopt` si `to` n'a pas de
     hash au manifeste, `to` est sauvegardé puis remplacé, comme tout fichier
     en conflit). Si `from` est modifié localement mais que `to`
     est libre, le renommage a lieu et l'entrée du manifeste (ancien hash) est
-    reportée sur `to` : la modification locale ressortira en conflit au
-    `apply` suivant au lieu d'être écrasée.
+    reportée sur `to`, dans la même section (`files` ou `retired`) : la
+    modification locale ressortira en conflit au `apply` suivant au lieu
+    d'être écrasée.
 
 Codes de sortie : `0` succès, `1` erreur, `2` terminé avec conflits (ou
 `doctor` en échec).
