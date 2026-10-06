@@ -344,6 +344,77 @@ test('CLI : --help, --version, commande et option inconnues', () => {
   assert.equal(cli(['plan', '--inconnu']).status, 1);
 });
 
+test('--force n\'écrase jamais une sauvegarde existante : .acc-bak, .2.acc-bak, .3.acc-bak', () => {
+  const dir = preparedProject('blank');
+  cli(['apply', dir]);
+  commitAll(dir, 'standard');
+  const rel = '.claude/hooks/validate-bash.sh';
+  const versions = ['#!/usr/bin/env bash\necho "perso A"\n', '#!/usr/bin/env bash\necho "perso B"\n', '#!/usr/bin/env bash\necho "perso C"\n'];
+
+  const forceAvec = (content) => {
+    write(dir, rel, content);
+    commitAll(dir, 'modif locale');
+    const res = cli(['apply', dir, '--force']);
+    assert.equal(res.status, 0, res.stderr);
+    assert.match(read(dir, rel), /validate-bash v1/, 'le standard est remis en place');
+    commitAll(dir, 'force');
+    return res;
+  };
+
+  const first = forceAvec(versions[0]);
+  assert.equal(read(dir, `${rel}.acc-bak`), versions[0]);
+  assert.match(first.stdout, /Sauvegardes créées :\s+- \.claude\/hooks\/validate-bash\.sh\.acc-bak/);
+
+  const second = forceAvec(versions[1]);
+  assert.equal(read(dir, `${rel}.acc-bak`), versions[0], 'la première sauvegarde est intacte');
+  assert.equal(read(dir, `${rel}.2.acc-bak`), versions[1]);
+  assert.match(second.stdout, /forcé, sauvegarde \.claude\/hooks\/validate-bash\.sh\.2\.acc-bak/, 'le plan annonce le nom réel');
+  assert.match(second.stdout, /- \.claude\/hooks\/validate-bash\.sh\.2\.acc-bak/);
+
+  forceAvec(versions[2]);
+  assert.equal(read(dir, `${rel}.acc-bak`), versions[0]);
+  assert.equal(read(dir, `${rel}.2.acc-bak`), versions[1]);
+  assert.equal(read(dir, `${rel}.3.acc-bak`), versions[2]);
+
+  // Même contenu local qu'une sauvegarde existante : elle est réutilisée.
+  const reuse = forceAvec(versions[1]);
+  assert.match(reuse.stdout, /forcé, sauvegarde \.claude\/hooks\/validate-bash\.sh\.2\.acc-bak/);
+  assert.equal(exists(dir, `${rel}.4.acc-bak`), false, 'pas de doublon de sauvegarde');
+
+  // Rien à forcer quand le fichier est conforme : aucune sauvegarde de plus.
+  const calm = cli(['apply', dir, '--force']);
+  assert.doesNotMatch(calm.stdout, /Sauvegardes créées/);
+  assert.equal(exists(dir, `${rel}.4.acc-bak`), false);
+});
+
+test('--force sur un bloc modifié : sauvegarde numérotée de AGENTS.md', () => {
+  const dir = preparedProject('blank');
+  cli(['apply', dir]);
+  commitAll(dir, 'standard');
+  const editions = ['- Branche principale : trunk (A)', '- Branche principale : trunk (B)'];
+  const avantA = read(dir, 'AGENTS.md').replace('- Branche principale : main', editions[0]);
+  write(dir, 'AGENTS.md', avantA);
+  commitAll(dir, 'modif A');
+  assert.equal(cli(['apply', dir, '--force']).status, 0);
+  commitAll(dir, 'force A');
+  const avantB = read(dir, 'AGENTS.md').replace('- Branche principale : main', editions[1]);
+  write(dir, 'AGENTS.md', avantB);
+  commitAll(dir, 'modif B');
+  assert.equal(cli(['apply', dir, '--force']).status, 0);
+  assert.equal(read(dir, 'AGENTS.md.acc-bak'), avantA);
+  assert.equal(read(dir, 'AGENTS.md.2.acc-bak'), avantB);
+});
+
+test('.acc-new et sauvegardes sont ignorés par git, y compris les sauvegardes numérotées', () => {
+  const dir = preparedProject('blank');
+  cli(['apply', dir]);
+  commitAll(dir, 'standard');
+  write(dir, 'x.md.acc-bak', 'a\n');
+  write(dir, 'x.md.2.acc-bak', 'b\n');
+  write(dir, 'x.md.acc-new', 'c\n');
+  assert.equal(git(dir, 'status', '--porcelain'), '');
+});
+
 /** Copie les gabarits de test puis applique une modification. */
 function copyTemplatesWith(mutate) {
   const dir = copyTemplates();

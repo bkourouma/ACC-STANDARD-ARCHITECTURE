@@ -4,7 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { applyStandard, assertCleanRepo } from './apply.mjs';
 import { readRawConfig, writeConfig } from './config.mjs';
-import { AccError, cloneJson, resolveDest, toPosix } from './fs-utils.mjs';
+import { AccError, cloneJson, readTextIfExists, resolveDest, sha256, toPosix } from './fs-utils.mjs';
 import { readManifest, saveManifest } from './manifest.mjs';
 import { compareSemver, parseSemver, STANDARD_VERSION } from './version.mjs';
 
@@ -24,15 +24,31 @@ export function listMigrations(dir, from, to = STANDARD_VERSION) {
     .sort((a, b) => compareSemver(a.version, b.version));
 }
 
-/** Aides offertes aux migrations : renommer ou supprimer un fichier géré (disque + manifeste). */
-function migrationHelpers(target, manifest, log) {
+/**
+ * Aides offertes aux migrations : renommer ou supprimer un fichier géré
+ * (disque + manifeste). Elles ne détruisent jamais de travail local (voir
+ * docs/CONTRACT.md §7) : un fichier qu'elles laissent en place sort du
+ * manifeste et devient propriété du projet.
+ */
+export function migrationHelpers(target, manifest, log) {
   const files = manifest?.files ?? {};
+  // Vrai si le fichier est exactement tel que le standard l'a posé.
+  const untouched = (rel, abs) => {
+    const entry = files[rel];
+    const text = readTextIfExists(abs);
+    return entry?.mode === 'managed' && Boolean(entry.hash) && text !== null && sha256(text) === entry.hash;
+  };
   return {
     renameManaged(from, to) {
-      const src = resolveDest(target, from);
-      const dst = resolveDest(target, to);
       const [a, b] = [toPosix(from), toPosix(to)];
+      const src = resolveDest(target, a);
+      const dst = resolveDest(target, b);
       if (fs.existsSync(src)) {
+        if (fs.existsSync(dst)) {
+          delete files[a];
+          log(`non renommé : ${b} existe déjà, ${a} conservé (propriété du projet)`);
+          return;
+        }
         fs.mkdirSync(path.dirname(dst), { recursive: true });
         fs.renameSync(src, dst);
       }
@@ -43,10 +59,19 @@ function migrationHelpers(target, manifest, log) {
       log(`renommé : ${a} → ${b}`);
     },
     removeManaged(rel) {
-      const abs = resolveDest(target, rel);
-      fs.rmSync(abs, { force: true });
-      delete files[toPosix(rel)];
-      log(`supprimé : ${toPosix(rel)}`);
+      const a = toPosix(rel);
+      const abs = resolveDest(target, a);
+      if (!fs.existsSync(abs)) {
+        delete files[a];
+        log(`déjà absent : ${a}`);
+      } else if (untouched(a, abs)) {
+        fs.rmSync(abs);
+        delete files[a];
+        log(`supprimé : ${a}`);
+      } else {
+        delete files[a];
+        log(`conservé : ${a} (modifié localement ou non géré), propriété du projet`);
+      }
     },
   };
 }

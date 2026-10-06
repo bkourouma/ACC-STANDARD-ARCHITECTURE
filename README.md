@@ -52,7 +52,8 @@ Depuis un clone local, remplacer `npx github:…` par
 Projet déjà équipé (fichiers de l'architecture présents avant le standard,
 nombreux conflits `.acc-new` au premier `plan`) : `apply --adopt` pose la
 version du standard pour les seuls fichiers jamais repris par lui, en gardant
-la version locale en `.acc-bak` ; relire ensuite `git diff`.
+la version locale en sauvegarde `.acc-bak` (numérotée comme avec `--force`,
+voir plus bas) ; relire ensuite `git diff`.
 
 ## Modes de propriété
 
@@ -70,7 +71,21 @@ détruit rien :
 - **merge-json** / **merge-lines** : fusion sans suppression (`settings.json`,
   `package.json`, `.mcp.json`, `.gitignore`).
 
+Avec `--force` ou `--adopt`, le fichier remplacé est d'abord sauvegardé en
+`.acc-bak`, puis `.2.acc-bak`, `.3.acc-bak`… : une sauvegarde n'est jamais
+écrasée, et le plan comme le rapport d'`apply` donnent le nom réel.
+
 La spécification complète est dans [docs/CONTRACT.md](docs/CONTRACT.md).
+
+## Portée des garde-fous
+
+Les hooks Claude Code livrés (`validate-bash.sh`, `pre-commit.sh`) sont un
+filet contre les accidents, pas une barrière : `validate-bash.sh` est une liste
+noire d'expressions régulières qui ne voit ni une branche construite par
+variable, ni `git -C`, ni un script, et les deux hooks échouent ouverts. Gardez
+la protection de branche de votre hébergeur. Les limites connues sont listées
+dans [docs/CONTRACT.md](docs/CONTRACT.md) §8 et écrites en tests `todo`
+(`test/hooks.test.mjs`).
 
 ## Profils
 

@@ -170,11 +170,23 @@ SHA-256 hexadécimal du contenu normalisé.
 
 | Mode          | Cible absente | Cible présente |
 | ------------- | ------------- | -------------- |
-| `managed`     | créer | si contenu = nouveau → rien ; sinon si `hash(actuel)` = hash du manifeste → remplacer ; sinon **conflit** : écrire `<dest>.acc-new`, ne pas toucher `<dest>` (avec `--force`, ou `--adopt` si le fichier n'a jamais été repris — voir ci-dessous : copier `<dest>` en `<dest>.acc-bak` puis remplacer) |
+| `managed`     | créer | si contenu = nouveau → rien ; sinon si `hash(actuel)` = hash du manifeste → remplacer ; sinon **conflit** : écrire `<dest>.acc-new`, ne pas toucher `<dest>` (avec `--force`, ou `--adopt` si le fichier n'a jamais été repris — voir ci-dessous : sauvegarder `<dest>` en `<dest>.acc-bak` ou `<dest>.N.acc-bak` puis remplacer) |
 | `block`       | créer (fichier rendu complet) | pour chaque bloc du gabarit : bloc présent dans la cible → remplacer son contenu si son hash actuel = hash du manifeste (ou s'il n'y a pas d'entrée et que le contenu est identique), sinon conflit de bloc ; bloc absent → l'ajouter en fin de fichier précédé d'une ligne vide. Les blocs de la cible absents du gabarit sont laissés tels quels. En cas de conflit : écrire `<dest>.acc-new` (fichier proposé complet) et ne rien modifier dans `<dest>` (même règle `--force` / `--adopt` que `managed`). Écrit en plus le squelette `.acc/skeletons/<dest>`, voir ci-dessous |
 | `seed`        | créer | ne jamais toucher |
 | `merge-json`  | créer (JSON du fragment) | fusion profonde, voir ci-dessous |
 | `merge-lines` | créer | ajouter les lignes absentes à la fin, sous un en-tête `# acc-standard` ajouté une seule fois |
+
+Sauvegardes `--force` et `--adopt` (`managed` et `block`) : avant de
+remplacer `<dest>`, le moteur le copie en sauvegarde et **n'écrase jamais une
+sauvegarde existante**.
+La première s'appelle `<dest>.acc-bak` ; si elle existe déjà avec un contenu
+différent de `<dest>`, la suivante est `<dest>.2.acc-bak`, puis
+`<dest>.3.acc-bak`, etc. Si une sauvegarde existante a déjà exactement le
+contenu de `<dest>`, aucune nouvelle copie n'est faite (relancer la même
+commande ne multiplie pas les fichiers). Toutes les formes se terminent par
+`.acc-bak` : le motif `*.acc-bak` du `.gitignore` posé les couvre. Le plan
+annonce le nom réel de la sauvegarde (`forcé, sauvegarde <dest>.2.acc-bak`…)
+et `apply` liste dans son rapport chaque sauvegarde créée.
 
 Fusion `merge-lines` — ordre des négations : les lignes de négation du
 fragment (commençant par `!`, ex. `!.env.example`) doivent rester après le
@@ -215,10 +227,11 @@ les squelettes en attente.
 Adoption (`--adopt`) d'un projet déjà équipé : un fichier `managed` ou
 `block` en conflit **qui n'a jamais été repris par le standard** — pas
 d'entrée au manifeste, ou entrée sans `hash` (`managed`) ou sans hash pour
-chaque bloc en conflit (`block`) — est traité comme avec `--force` : copie en
-`<dest>.acc-bak`, puis version du standard posée. Un fichier déjà repris puis
-modifié localement reste un conflit (`.acc-new`) ; un `block` aux marqueurs
-invalides aussi. Le plan affiche `adopté, sauvegarde <dest>.acc-bak`.
+chaque bloc en conflit (`block`) — est traité comme avec `--force` :
+sauvegarde (même numérotation, voir « Sauvegardes » ci-dessus), puis version
+du standard posée. Un fichier déjà repris puis modifié localement reste un
+conflit (`.acc-new`) ; un `block` aux marqueurs invalides aussi. Le plan
+affiche `adopté, sauvegarde <dest>.acc-bak` (ou `<dest>.N.acc-bak`).
 L'utilisateur relit ensuite `git diff` (le dépôt était propre) et reporte ce
 qui doit l'être (fichiers `seed`, hors blocs) ou propose une évolution du
 standard.
@@ -344,9 +357,53 @@ ou variable ACC_TEMPLATES_DIR)
   paquet (ordre semver), puis `apply` (avec `--force` / `--adopt` s'ils sont
   donnés), puis met `standardVersion` à jour.
   Signature d'une migration :
-  `export default async function migrate({ target, config, log }) {}` ; elle
-  peut renommer ou supprimer des fichiers **gérés** et modifier `config`
-  (retourner la config modifiée).
+  `export default async function migrate({ target, config, log, renameManaged,
+  removeManaged }) {}` ; elle peut renommer ou supprimer des fichiers
+  **gérés** et modifier `config` (retourner la config modifiée). Les deux
+  aides ne détruisent jamais de travail local :
+  - `removeManaged(rel)` ne supprime le fichier que s'il est en mode `managed`
+    au manifeste **et** que son hash actuel est celui du manifeste. Sinon
+    (modifié localement, sans entrée de hash, `seed`, `block`…) le fichier est
+    conservé, son entrée quitte le manifeste (il devient propriété du projet)
+    et la raison est journalisée. Fichier déjà absent : l'entrée du manifeste
+    est simplement retirée.
+  - `renameManaged(from, to)` ne remplace jamais une destination existante :
+    si `to` existe, `from` reste en place, son entrée quitte le manifeste, un
+    message est journalisé, et le `apply` qui suit signale `to` comme conflit
+    s'il diffère du gabarit (avec `--force`, ou `--adopt` si `to` n'a pas de
+    hash au manifeste, `to` est sauvegardé puis remplacé, comme tout fichier
+    en conflit). Si `from` est modifié localement mais que `to`
+    est libre, le renommage a lieu et l'entrée du manifeste (ancien hash) est
+    reportée sur `to` : la modification locale ressortira en conflit au
+    `apply` suivant au lieu d'être écrasée.
 
 Codes de sortie : `0` succès, `1` erreur, `2` terminé avec conflits (ou
 `doctor` en échec).
+
+## 8. Garde-fous Claude Code livrés : portée et limites
+
+`.claude/settings.json` (fusionné) et les hooks `.claude/hooks/*.sh` (gérés)
+sont un **filet contre les accidents**, pas une barrière contre un agent qui
+contourne. Ce qu'ils garantissent et ce qu'ils ne garantissent pas :
+
+- `validate-bash.sh` est une liste noire d'expressions régulières appliquée au
+  texte de la commande. Il ne voit pas ce qui est construit dynamiquement
+  (variable, `git -C`, `git push origin HEAD` depuis une branche protégée,
+  `--mirror`, scripts, `node -e`…) ni ce qui est cité entre guillemets.
+  `docs/governance/SECURITY.md` et la protection de branche de l'hébergeur
+  restent la protection de dernier recours.
+- Les deux hooks **échouent ouverts** : outil absent, entrée illisible ou
+  exception → `exit 0`. Sous Windows sans bash, le hook n'est pas exécuté.
+- `settings.json` empêche l'agent de modifier ses propres garde-fous :
+  `permissions.deny` refuse Edit et Write sur `.claude/hooks/**`, et
+  `permissions.ask` impose une confirmation humaine pour Edit et Write sur
+  `.claude/settings.json` et `acc.config.json` (qui contient `guard.*`,
+  `git.protectedBranches` et `hooks.preCommit`). `ask` et non `deny` : la
+  compétence `/acc-adapt` doit pouvoir proposer des corrections à
+  `acc.config.json`. Ces règles ne couvrent pas une modification faite par
+  une commande shell (`sed -i`, redirection…).
+- Le moteur (`acc-standard apply`) n'est pas concerné par ces règles : il
+  tourne hors de Claude Code, sous la responsabilité de l'humain.
+- Le comportement des hooks est vérifié par `test/hooks.test.mjs`. Une limite
+  connue y est écrite comme test `todo` : elle se corrige en retirant le
+  `todo`, jamais en l'effaçant.

@@ -101,11 +101,16 @@ absente du fichier réel (hors blocs gérés) y est ajoutée, remplie à partir
 du code comme ci-dessus ou laissée en `TODO(acc-adapt)` ; une section déjà
 couverte sous un autre titre n'est pas dupliquée. Garde l'ordre et le ton du
 fichier existant, ne touche à aucun bloc géré. Le squelette une fois
-intégré, supprime-le (il n'est pas recréé). Pour une sauvegarde
-`<fichier>.acc-bak` d'un fichier adopté : reporte dans les fichiers seed ou
-hors blocs ce qu'elle contenait de propre au projet, note dans ton rapport ce
-qui relèverait d'une évolution du standard, puis laisse l'utilisateur la
-supprimer.
+intégré, supprime-le (il n'est pas recréé). Pour un fichier adopté, la
+sauvegarde est `<fichier>.acc-bak` ou `<fichier>.N.acc-bak` (premier nom
+libre, ou sauvegarde identique réutilisée : ni le numéro ni la date ne
+désignent la bonne). La version remplacée est celle qu'`apply` a listée dans
+« Sauvegardes créées » ; sans ce rapport, c'est la sauvegarde identique à la
+version du fichier avant l'adoption (`git show HEAD:<fichier>` si
+l'adoption n'est pas encore commitée, sinon le commit qui la précède).
+Reporte dans les fichiers seed ou hors blocs ce qu'elle contenait de propre
+au projet, note dans ton rapport ce qui relèverait d'une évolution du
+standard, puis laisse l'utilisateur la supprimer.
 
 ## 5. Créer les règles par chemin utiles
 

@@ -1,6 +1,6 @@
 // Mode block : seuls les blocs <!-- acc:begin id --> … <!-- acc:end id --> sont gérés.
 import path from 'node:path';
-import { AccError, finalize, readTextIfExists, sameContent, sha256, toLf } from '../fs-utils.mjs';
+import { AccError, backupSuffix, finalize, readTextIfExists, sameContent, sha256, toLf } from '../fs-utils.mjs';
 
 const BEGIN_RE = /^\s*<!--\s*acc:begin\s+(\S+)\s*-->\s*$/;
 const END_RE = /^\s*<!--\s*acc:end\s+(\S+)\s*-->\s*$/;
@@ -148,7 +148,7 @@ function conflictResult(item, { target, template, append, conflicts, entry, fres
   if (force || adopted) {
     return {
       action: '~',
-      detail: `${force ? 'forcé' : 'adopté'}, sauvegarde ${item.dest}.acc-bak`,
+      detail: `${force ? 'forcé' : 'adopté'}, sauvegarde ${item.dest}${backupSuffix(item.abs)}`,
       backup: true,
       adopted: !force,
       writes: [{ abs: item.abs, content: proposed }],
