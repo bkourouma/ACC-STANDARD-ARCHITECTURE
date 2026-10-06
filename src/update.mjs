@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { applyStandard, assertCleanRepo } from './apply.mjs';
 import { readRawConfig, writeConfig } from './config.mjs';
 import { AccError, cloneJson, readTextIfExists, resolveDest, sha256, toPosix } from './fs-utils.mjs';
-import { readManifest, saveManifest } from './manifest.mjs';
+import { readManifest, RETIRED_MODES, saveManifest } from './manifest.mjs';
 import { compareSemver, parseSemver, STANDARD_VERSION } from './version.mjs';
 
 /** Migrations applicables : version > from et <= to, triées. */
@@ -27,14 +27,28 @@ export function listMigrations(dir, from, to = STANDARD_VERSION) {
 /**
  * Aides offertes aux migrations : renommer ou supprimer un fichier géré
  * (disque + manifeste). Elles ne détruisent jamais de travail local (voir
- * docs/CONTRACT.md §7) : un fichier qu'elles laissent en place sort du
- * manifeste et devient propriété du projet.
+ * docs/CONTRACT.md §7) : un fichier qu'elles laissent en place devient
+ * propriété du projet, et son entrée managed/block passe dans `retired` (§6)
+ * pour qu'un retour du même chemin ne l'adopte pas.
  */
 export function migrationHelpers(target, manifest, log) {
-  const files = manifest?.files ?? {};
+  const book = manifest ?? { files: {} };
+  // Section qui porte l'entrée : files, à défaut retired.
+  const sectionOf = (rel) => (book.files[rel] ? book.files : book.retired?.[rel] ? book.retired : null);
+  const entryOf = (rel) => sectionOf(rel)?.[rel];
+  const forget = (rel) => {
+    delete book.files[rel];
+    if (book.retired) delete book.retired[rel];
+  };
+  // Fichier conservé hors livraison : seule une entrée managed/block garde sa trace.
+  const retire = (rel) => {
+    const entry = entryOf(rel);
+    forget(rel);
+    if (RETIRED_MODES.has(entry?.mode)) (book.retired ??= {})[rel] = entry;
+  };
   // Vrai si le fichier est exactement tel que le standard l'a posé.
   const untouched = (rel, abs) => {
-    const entry = files[rel];
+    const entry = entryOf(rel);
     const text = readTextIfExists(abs);
     return entry?.mode === 'managed' && Boolean(entry.hash) && text !== null && sha256(text) === entry.hash;
   };
@@ -45,16 +59,17 @@ export function migrationHelpers(target, manifest, log) {
       const dst = resolveDest(target, b);
       if (fs.existsSync(src)) {
         if (fs.existsSync(dst)) {
-          delete files[a];
+          retire(a);
           log(`non renommé : ${b} existe déjà, ${a} conservé (propriété du projet)`);
           return;
         }
         fs.mkdirSync(path.dirname(dst), { recursive: true });
         fs.renameSync(src, dst);
       }
-      if (files[a]) {
-        files[b] = files[a];
-        delete files[a];
+      const section = sectionOf(a);
+      if (section) {
+        section[b] = section[a];
+        delete section[a];
       }
       log(`renommé : ${a} → ${b}`);
     },
@@ -62,14 +77,14 @@ export function migrationHelpers(target, manifest, log) {
       const a = toPosix(rel);
       const abs = resolveDest(target, a);
       if (!fs.existsSync(abs)) {
-        delete files[a];
+        forget(a);
         log(`déjà absent : ${a}`);
       } else if (untouched(a, abs)) {
         fs.rmSync(abs);
-        delete files[a];
+        forget(a);
         log(`supprimé : ${a}`);
       } else {
-        delete files[a];
+        retire(a);
         log(`conservé : ${a} (modifié localement ou non géré), propriété du projet`);
       }
     },

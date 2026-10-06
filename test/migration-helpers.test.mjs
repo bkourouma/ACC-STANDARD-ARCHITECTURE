@@ -27,6 +27,7 @@ test('removeManaged : fichier tel que posé → supprimé, entrée retirée', ()
   assert.equal(exists(dir, 'scripts/a.cjs'), false);
   assert.equal(manifest.files['scripts/a.cjs'], undefined);
   assert.deepEqual(lines, ['supprimé : scripts/a.cjs']);
+  assert.equal(manifest.retired, undefined, 'fichier supprimé : aucune trace');
 });
 
 test('removeManaged : fin de ligne CRLF seule → toujours « tel que posé »', () => {
@@ -40,7 +41,8 @@ test('removeManaged : fichier modifié localement → conservé, devient propri�
   const { dir, manifest, lines, helpers } = setup({ 'scripts/a.cjs': { content: edited, entry: managed(POSE) } });
   helpers.removeManaged('scripts/a.cjs');
   assert.equal(read(dir, 'scripts/a.cjs'), edited);
-  assert.equal(manifest.files['scripts/a.cjs'], undefined, 'il ne figure plus au manifeste');
+  assert.equal(manifest.files['scripts/a.cjs'], undefined, 'il n\'est plus livré');
+  assert.deepEqual(manifest.retired, { 'scripts/a.cjs': managed(POSE) }, 'trace gardée : un retour du chemin sera un conflit');
   assert.match(lines[0], /conservé : scripts\/a\.cjs/);
 });
 
@@ -54,6 +56,7 @@ test('removeManaged : sans entrée au manifeste, entrée sans hash ou autre mode
   for (const rel of ['a.txt', 'b.txt', 'c.txt', 'd.txt']) helpers.removeManaged(rel);
   for (const rel of ['a.txt', 'b.txt', 'c.txt', 'd.txt']) assert.ok(exists(dir, rel), `${rel} doit rester`);
   assert.deepEqual(manifest.files, {});
+  assert.deepEqual(Object.keys(manifest.retired), ['b.txt', 'd.txt'], 'seules les entrées managed/block sont gardées');
 });
 
 test('removeManaged : fichier déjà absent → entrée retirée, pas d\'erreur', () => {
@@ -62,6 +65,19 @@ test('removeManaged : fichier déjà absent → entrée retirée, pas d\'erreur'
   helpers.removeManaged('scripts/a.cjs');
   assert.equal(manifest.files['scripts/a.cjs'], undefined);
   assert.match(lines[0], /déjà absent/);
+  assert.equal(manifest.retired, undefined);
+});
+
+test('removeManaged : entrée dans retired → même règle (supprimé si tel que posé, sinon conservé)', () => {
+  const edited = `${POSE}// ajout de l'équipe\n`;
+  const { dir, manifest, helpers } = setup({ 'scripts/a.cjs': { content: POSE }, 'scripts/b.cjs': { content: edited } });
+  manifest.retired = { 'scripts/a.cjs': managed(POSE), 'scripts/b.cjs': managed(POSE) };
+  helpers.removeManaged('scripts/a.cjs');
+  helpers.removeManaged('scripts/b.cjs');
+  assert.equal(exists(dir, 'scripts/a.cjs'), false);
+  assert.equal(read(dir, 'scripts/b.cjs'), edited);
+  assert.deepEqual(manifest.retired, { 'scripts/b.cjs': managed(POSE) });
+  assert.deepEqual(manifest.files, {});
 });
 
 test('renameManaged : renomme et reporte l\'entrée du manifeste', () => {
@@ -82,6 +98,7 @@ test('renameManaged : destination existante → jamais écrasée, source conserv
   assert.equal(read(dir, 'scripts/new.cjs'), mine, 'la destination est intacte');
   assert.equal(read(dir, 'scripts/old.cjs'), POSE, 'la source reste en place');
   assert.equal(manifest.files['scripts/old.cjs'], undefined);
+  assert.deepEqual(manifest.retired, { 'scripts/old.cjs': managed(POSE) }, 'trace de la source gardée');
   assert.deepEqual(manifest.files['scripts/new.cjs'], managed('// autre hash\n'), 'entrée de la destination inchangée');
   assert.match(lines[0], /non renommé : scripts\/new\.cjs existe déjà/);
 });
@@ -100,6 +117,16 @@ test('renameManaged : source absente → l\'entrée suit, rien n\'est créé', (
   helpers.renameManaged('scripts/old.cjs', 'scripts/new.cjs');
   assert.equal(exists(dir, 'scripts/new.cjs'), false);
   assert.ok(manifest.files['scripts/new.cjs']);
+});
+
+test('renameManaged : entrée dans retired → reportée sur la destination, dans retired', () => {
+  const edited = `${POSE}// ajout de l'équipe\n`;
+  const { dir, manifest, helpers } = setup({ 'scripts/old.cjs': { content: edited } });
+  manifest.retired = { 'scripts/old.cjs': managed(POSE) };
+  helpers.renameManaged('scripts/old.cjs', 'scripts/new.cjs');
+  assert.equal(read(dir, 'scripts/new.cjs'), edited);
+  assert.deepEqual(manifest.retired, { 'scripts/new.cjs': managed(POSE) });
+  assert.deepEqual(manifest.files, {});
 });
 
 test('les aides refusent un chemin qui sort de la cible', () => {
@@ -127,5 +154,8 @@ test('update : un agent-bus.cjs déjà présent n\'est pas écrasé par le renom
   assert.match(res.stdout, /non renommé : scripts\/agent-bus\.cjs existe déjà/);
   assert.equal(read(dir, 'scripts/agent-bus.cjs'), mine, 'le fichier de l\'équipe est intact');
   assert.equal(read(dir, 'scripts/old-bus.cjs'), oldContent, 'l\'ancien fichier est conservé');
+  const after = JSON.parse(read(dir, '.acc/manifest.json'));
+  assert.equal(after.files['scripts/old-bus.cjs'], undefined, 'plus livré');
+  assert.equal(after.retired['scripts/old-bus.cjs'].hash, sha256(oldContent), 'trace gardée après le apply');
   assert.match(read(dir, 'scripts/agent-bus.cjs.acc-new'), /Bus d'agents de test/, 'conflit signalé, proposition à côté');
 });

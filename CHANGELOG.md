@@ -12,8 +12,21 @@ ou supprime un fichier géré fournit `migrations/<version>.mjs`.
   `apply` liste les sauvegardes créées.
 - Correction (`update`) : `removeManaged` ne supprime plus un fichier modifié
   localement, et `renameManaged` n'écrase plus une destination existante. Dans
-  les deux cas le fichier est conservé, quitte le manifeste et le journal en
-  donne la raison (`docs/CONTRACT.md` §7).
+  les deux cas le fichier est conservé, son entrée passe dans la section
+  `retired` du manifeste (voir ci-dessous) et le journal en donne la raison
+  (`docs/CONTRACT.md` §7).
+- Correction (manifeste, `--adopt`) : un fichier `managed` ou `block` repris
+  par le standard qui n'est plus livré (condition `when` devenue fausse, comme
+  `options.agentBus` ; profil, adaptateur ou `options.demoInstance` retiré)
+  mais existe encore garde son entrée et son hash dans une nouvelle section
+  `retired` de `.acc/manifest.json`. Jusqu'ici l'entrée disparaissait : quand
+  le fichier était de nouveau livré, `apply --adopt` ou `update --adopt`
+  remplaçait sa version modifiée localement au lieu de produire un conflit
+  `.acc-new`. Désormais il ressort en conflit s'il a été modifié, est mis à
+  jour s'il est resté tel que posé, et un `block` ne reçoit pas de nouveau
+  squelette. La trace est oubliée quand le fichier est supprimé ; la section
+  est absente quand elle est vide, et un ancien manifeste reste valide
+  (`docs/CONTRACT.md` §5, §6 et §7).
 - Sécurité (gabarit `base`) : `.claude/settings.json` refuse à l'agent
   l'édition de `.claude/hooks/**` et demande confirmation avant toute édition
   de `.claude/settings.json` et d'`acc.config.json` (qui porte `guard.*`).
