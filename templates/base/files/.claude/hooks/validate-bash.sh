@@ -133,13 +133,27 @@ function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// Début d'une commande git, options globales comprises : « git push »,
+// « git -C dossier push », « git --no-pager -c k=v push »… Sans cela,
+// `git -C . push origin main` échapperait à toutes les règles ci-dessous.
+// Un chemin cité (« -C "mon dossier" ») est déjà masqué en espaces.
+const GIT_VALUE = "(?:\"\\s*\"|'\\s*'|\\S+)";
+const GIT_OPTION =
+  "(?:-[Cc]\\s+" + GIT_VALUE + "|--(?:git-dir|work-tree|namespace|exec-path)(?:=|\\s+)" + GIT_VALUE + "|--[a-z][a-z-]*)";
+const GIT = "\\bgit\\s+(?:" + GIT_OPTION + "\\s+)*";
+
+// RegExp commençant par « git [options globales] », suivi de `rest`.
+function gitRe(rest, flags) {
+  return new RegExp(GIT + rest, flags);
+}
+
 // --- Règle 1 : git stash sous toutes ses formes qui modifient l'arbre -----
 // list, show, create et apply sont en lecture (ou n'effacent rien) ; push,
 // pop, drop, clear, save et le "git stash" nu (équivalent à push) vident ou
 // perdent du travail dans un arbre partagé entre agents.
 function checkGitStash(cmd) {
   const allowed = ["list", "show", "create", "apply"];
-  const re = /\bgit\s+stash(?:\s+(-{0,2}[a-zA-Z-]+))?/g;
+  const re = gitRe("stash(?:\\s+(-{0,2}[a-zA-Z-]+))?", "g");
   let m;
   while ((m = re.exec(cmd)) !== null) {
     const sub = m[1];
@@ -158,25 +172,51 @@ function checkGitStash(cmd) {
 // --- Règle 2 : git push forcé / vers une branche protégée ----------------
 // --force-with-lease est toléré hors branche protégée ; --force et -f nus
 // sont toujours bloqués ; une poussée vers une branche protégée est bloquée
-// même sans option de force.
+// même sans option de force ; --mirror écrase toutes les références distantes.
 function targetsProtectedBranch(str) {
   const names = PROTECTED_BRANCHES.map(escapeRegExp).join("|");
-  const re = new RegExp("(^|\\s|:|\\+)(refs/heads/)?(" + names + ")(\\s|$)");
+  const re = new RegExp("(^|\\s|:|\\+)(refs/heads/)?(" + names + ")(\\s|$|[\"'])");
   return re.test(str);
 }
 
+// Découpe la commande en segments (&&, ||, ;, |, retour à la ligne) en gardant
+// la position de chacun, pour retrouver le texte non masqué correspondant.
+function splitSegments(cmd) {
+  const out = [];
+  const sep = /&&|\|\||[;|\n]/g;
+  let from = 0;
+  let m;
+  while ((m = sep.exec(cmd)) !== null) {
+    out.push({ start: from, text: cmd.slice(from, m.index) });
+    from = m.index + m[0].length;
+  }
+  out.push({ start: from, text: cmd.slice(from) });
+  return out;
+}
+
+// Les chaînes citées sont vidées par la neutralisation, ce qui cacherait une
+// cible citée (`git push origin "main"`). `rawCommand` a la même longueur que
+// la commande neutralisée : on y relit les arguments, guillemets retirés.
+function unquotedArgs(seg, args) {
+  if (!rawCommand || rawCommand.length !== neutralizedLength) return args;
+  const begin = seg.start + seg.text.length - args.length;
+  return rawCommand.slice(begin, seg.start + seg.text.length).replace(/["']/g, "");
+}
+
 function checkGitPush(cmd) {
-  const segments = cmd.split(/&&|\|\||[;|\n]/);
-  for (const seg of segments) {
-    const m = seg.match(/\bgit\s+push\b(.*)$/);
+  for (const seg of splitSegments(cmd)) {
+    const m = seg.text.match(gitRe("push\\b(.*)$"));
     if (!m) continue;
     const args = m[1];
 
-    if (targetsProtectedBranch(args)) {
+    if (targetsProtectedBranch(args) || targetsProtectedBranch(unquotedArgs(seg, args))) {
       return (
         "git push vers une branche protégée (" + PROTECTED_BRANCHES.join(", ") + ") est bloqué : " +
         "passer par une branche de travail et une pull request."
       );
+    }
+    if (/(^|\s)--mirror\b/.test(args)) {
+      return "git push --mirror est bloqué : il écrase toutes les références distantes, branches protégées comprises.";
     }
     const forceTokens = args.match(/--force(-[a-zA-Z-]+)*/g) || [];
     for (const tok of forceTokens) {
@@ -194,11 +234,29 @@ function checkGitPush(cmd) {
   return null;
 }
 
+// Supprimer ou renommer une branche protégée en local prépare une poussée qui
+// la détruit ou la remplace : `git branch -D main`, `git branch -m main x`.
+function checkProtectedBranchRewrite(cmd) {
+  for (const seg of splitSegments(cmd)) {
+    const m = seg.text.match(gitRe("branch\\b(.*)$"));
+    if (!m) continue;
+    const args = m[1];
+    const rewrites = /(^|\s)(--delete|--move|-[a-zA-Z]*[dDmM][a-zA-Z]*)(\s|$)/.test(args);
+    if (rewrites && (targetsProtectedBranch(args) || targetsProtectedBranch(unquotedArgs(seg, args)))) {
+      return (
+        "supprimer ou renommer une branche protégée (" + PROTECTED_BRANCHES.join(", ") + ") est bloqué : " +
+        "demande à l'utilisateur."
+      );
+    }
+  }
+  return null;
+}
+
 // --- Règle 3 : contournement des hooks git -------------------------------
 function checkHookBypass(cmd) {
   const segments = cmd.split(/&&|\|\||[;|\n]/);
   for (const seg of segments) {
-    const m = seg.match(/\bgit\s+(commit|push|merge|rebase|am|cherry-pick)\b(.*)$/);
+    const m = seg.match(gitRe("(commit|push|merge|rebase|am|cherry-pick)\\b(.*)$"));
     if (!m) continue;
     if (/--no-verify\b/.test(m[2])) {
       return "--no-verify est bloqué : les contrôles des hooks git ne se contournent pas, ils se corrigent.";
@@ -215,10 +273,10 @@ function checkHookBypass(cmd) {
   if (/(^|[\s;&|])(export\s+)?HUSKY=0\b/.test(cmd)) {
     return "HUSKY=0 est bloqué : désactiver les hooks git revient à les contourner.";
   }
-  if (/\bgit\s+(-c\s+\S+\s+)*config\b[^|;&\n]*\bcore\.hooksPath\b/.test(cmd) && !/--get\b|--list\b|(^|\s)-l(\s|$)/.test(cmd)) {
+  if (gitRe("config\\b[^|;&\\n]*\\bcore\\.hooksPath\\b").test(cmd) && !/--get\\b|--list\\b|(^|\\s)-l(\\s|$)/.test(cmd)) {
     return "modifier core.hooksPath est bloqué : cela désactive les hooks git installés.";
   }
-  if (/\bgit\s+-c\s+core\.hooksPath=/.test(cmd)) {
+  if (/\bgit\s+(?:\S+\s+)*?-c\s+core\.hooksPath=/.test(cmd)) {
     return "git -c core.hooksPath=… est bloqué : cela contourne les hooks git installés.";
   }
   return null;
@@ -226,23 +284,23 @@ function checkHookBypass(cmd) {
 
 // --- Règle 4 : abandon de travail sur tout l'arbre -----------------------
 function checkTreeWipe(cmd) {
-  if (/\bgit\s+reset\b[^|;&\n]*--hard\b/.test(cmd)) {
+  if (gitRe("reset\\b[^|;&\\n]*--hard\\b").test(cmd)) {
     return "git reset --hard est bloqué : abandon irréversible des modifications de l'arbre de travail partagé. Demande à l'utilisateur.";
   }
-  if (/\bgit\s+clean\b/.test(cmd)) {
-    const cleanMatch = cmd.match(/\bgit\s+clean\b[^|;&\n]*/);
+  if (gitRe("clean\\b").test(cmd)) {
+    const cleanMatch = cmd.match(gitRe("clean\\b[^|;&\\n]*"));
     const segment = cleanMatch ? cleanMatch[0] : cmd;
     if (/(^|\s)-[a-zA-Z]*f[a-zA-Z]*(\s|$)/.test(segment) || /--force\b/.test(segment)) {
       return "git clean -f est bloqué : suppression irréversible des fichiers non suivis.";
     }
   }
-  if (/\bgit\s+checkout\s+(-f\s+)?--\s+\.(\s|$)/.test(cmd)) {
+  if (gitRe("checkout\\s+(-f\\s+)?--\\s+\\.(\\s|$)").test(cmd)) {
     return "git checkout -- . est bloqué : abandon de toutes les modifications de l'arbre de travail.";
   }
-  if (/\bgit\s+checkout\s+\.(\s|$)/.test(cmd)) {
+  if (gitRe("checkout\\s+\\.(\\s|$)").test(cmd)) {
     return "git checkout . est bloqué : abandon de toutes les modifications de l'arbre de travail.";
   }
-  if (/\bgit\s+restore\b[^|;&\n]*\s\.(\s|$)/.test(cmd) || /\bgit\s+restore\s+\.(\s|$)/.test(cmd)) {
+  if (gitRe("restore\\b[^|;&\\n]*\\s\\.(\\s|$)").test(cmd) || gitRe("restore\\s+\\.(\\s|$)").test(cmd)) {
     return "git restore . est bloqué : abandon de toutes les modifications de l'arbre de travail.";
   }
   return null;
@@ -336,9 +394,9 @@ function checkProjectRules(cmd) {
 //   - le contenu de toute chaîne entre guillemets, SAUF si elle est
 //     l'argument d'un `bash -c`, `sh -c`, `powershell -Command`, `pwsh -c`,
 //     `eval` ou `cmd /c`, auquel cas son contenu reste analysable.
-// Limite connue et acceptée : une cible légitime mais citée (ex.
-// `git push origin "main"`) est elle aussi neutralisée. Le hook pre-push de
-// Lefthook reste la garde de dernier recours.
+// Exception : la cible d'un `git push` ou d'un `git branch` est relue sans
+// guillemets (unquotedArgs), pour que `git push origin "main"` reste refusé.
+// Le hook pre-push de Lefthook reste la garde de dernier recours.
 
 const EXECUTOR_NAMES = ["bash", "sh", "zsh", "dash", "powershell", "powershell.exe", "pwsh", "cmd", "cmd.exe", "eval"];
 
@@ -454,8 +512,14 @@ function maskQuotesKeepLength(str) {
   return out;
 }
 
+// Commande après retrait des heredocs, avant masquage des guillemets : même
+// longueur que la commande neutralisée (voir unquotedArgs).
+let rawCommand = "";
+let neutralizedLength = -1;
+
 function neutralizeCommand(rawCmd) {
   const working = stripHeredocs(rawCmd);
+  rawCommand = working;
   const protectedRanges = findProtectedRanges(working);
   let shielded = working;
   if (protectedRanges.length) {
@@ -470,6 +534,7 @@ function neutralizeCommand(rawCmd) {
   for (const [s, e] of protectedRanges) {
     for (let k = s; k < e; k++) finalChars[k] = working[k];
   }
+  neutralizedLength = finalChars.length;
   return finalChars.join("");
 }
 
@@ -485,6 +550,7 @@ const neutralizedCmd = neutralizeCommand(cmd);
 const checks = [
   checkGitStash,
   checkGitPush,
+  checkProtectedBranchRewrite,
   checkHookBypass,
   checkTreeWipe,
   checkDbDestructive,

@@ -387,9 +387,12 @@ sont un **filet contre les accidents**, pas une barrière contre un agent qui
 contourne. Ce qu'ils garantissent et ce qu'ils ne garantissent pas :
 
 - `validate-bash.sh` est une liste noire d'expressions régulières appliquée au
-  texte de la commande. Il ne voit pas ce qui est construit dynamiquement
-  (variable, `git -C`, `git push origin HEAD` depuis une branche protégée,
-  `--mirror`, scripts, `node -e`…) ni ce qui est cité entre guillemets.
+  texte de la commande. Il lit les options globales de git (`git -C dossier
+  push`, `git -c k=v …`), la cible d'une poussée citée (`git push origin
+  "main"`), `push --mirror` et la suppression ou le renommage d'une branche
+  protégée (`git branch -D main`). Il ne voit pas ce qui est construit
+  dynamiquement (variable, `git push origin HEAD` depuis une branche protégée,
+  scripts, `node -e`…) ni le reste de ce qui est cité entre guillemets.
   `docs/governance/SECURITY.md` et la protection de branche de l'hébergeur
   restent la protection de dernier recours.
 - Les deux hooks **échouent ouverts** : outil absent, entrée illisible ou
